@@ -84,7 +84,41 @@ AI_TOOLS = [
                 "required": ["filename", "content"]
             }
         }
-    }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_to_trash",
+            "description": "Delete a note and send it to a trash",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "type": "string",
+                        "description": "The filename, e.g., 'Idea.md'.",
+                    }
+                },
+                "required": ["filename"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "restore_from_trash",
+            "description": "Restore a deleted items from the trash",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "type": "string",
+                        "description": "The filename, e.g., 'Idea.md'.",
+                    }
+                },
+                "required": ["filename"],
+            },
+        },
+    },
 ]
 
 
@@ -138,6 +172,14 @@ class SecondBrainAgent:
                         if search_results
                         else "No Notes Found"
                     )
+
+                elif function_name == "delete_to_trash":
+                    filename =function_args.get("filename")
+                    tool_output = delete_to_trash(self.vault_path, filename)
+
+                elif function_name == "restore_from_trash":
+                    filename =function_args.get("filename")
+                    tool_output = restore_from_trash(self.vault_path, filename)
 
                 elif function_name == "read_note":
                     filename = function_args.get("filename")
