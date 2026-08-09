@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from src.vault import read_note, search_notes
+from src.vault import append_note, read_note, read_note, search_notes
 
 load_dotenv(".env.local")
 
@@ -43,6 +43,48 @@ AI_TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "write_note",
+            "description": "Create a new note or overwrite an existing note in the vault with structured markdown content.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "type": "string",
+                        "description": "The target relative path and filename, e.g., 'Notes/Draft.md'."
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The markdown content of the note."
+                    }
+                },
+                "required": ["filename", "content"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "append_note",
+            "description": "Append text or logs to the bottom of an existing note in the vault.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "filename": {
+                        "type": "string",
+                        "description": "The target filename, e.g., 'DailyLog.md'."
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "The text content to append."
+                    }
+                },
+                "required": ["filename", "content"]
+            }
+        }
+    }
 ]
 
 
@@ -55,23 +97,30 @@ class SecondBrainAgent:
             "You are a Second Brain AI Agent. Help the user analyze their personal notes. "
             "Use the provided tools to search and read their notes before answering."
         )
+        self.messages = [
+            {"role": "system", "content": self.system_prompt}
+        ]
+        
+    def clear_history(self) -> None:
+        """Reset conversation history back to only the system prompt."""
+        self.messages = [
+            {"role": "system", "content": self.system_prompt}
+        ]
+
 
     def ask(self, user_message: str) -> str:
         """Send a message to the AI and run the tool call loop if necessary"""
 
-        messages = [
-            {"role": "system", "content": self.system_prompt},
-            {"role": "user", "content": user_message},
-        ]
+        self.messages.append({"role": "user","content": user_message})
 
         for _ in range(5):
             response = client.chat.completions.create(
-                model=self.model, messages=messages, tools=AI_TOOLS, tool_choice="auto"
+                model=self.model, messages=self.messages, tools=AI_TOOLS, tool_choice="auto"
             )
 
             response_message = response.choices[0].message
 
-            messages.append(response_message)
+            self.messages.append(response_message)
 
             if not response_message.tool_calls:
                 return response_message.content or "No response from AI."
@@ -94,9 +143,19 @@ class SecondBrainAgent:
                     filename = function_args.get("filename")
                     tool_output = read_note(self.vault_path, filename)
 
+                elif function_name == "write_note":
+                    filename = function_args.get("filename")
+                    content = function_args.get ("content")
+                    tool_output = write_note(self.vault_path, filename, content)
+
+                elif function_name == "append_note":
+                    filename = function_args.get("filename")
+                    content = function_args.get ("content")
+                    tool_output = append_note(self.vault_path, filename, content)
+
                 else:
                     tool_output = f"Error: Tool '{function_name}' not found."
-                messages.append(
+                self.messages.append(
                     {
                         "tool_call_id": tool_call.id,
                         "role": "tool",
