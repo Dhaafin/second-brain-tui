@@ -37,12 +37,23 @@
     padding: 1 2;
 }
 
+#loading-status {
+    display: none;
+    height: 1;
+    width: 100%;
+    color: #fbbf24; /* Amber */
+    background: transparent;
+    text-align: center;
+    text-style: bold;
+    margin-top: 1;
+}
+
 #chat-input {
     height: 3;
     background: #1e293b;
     border: tall #6366f1; /* Neon indigo */
     color: #f8fafc;
-    margin-top: 1;
+    margin-top: 0;
 }
 
 #chat-input:focus {

@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import DirectoryTree, Footer, Header, Input, Markdown
+from textual.widgets import DirectoryTree, Footer, Header, Input, Label, Markdown
 
 from src.agent import SecondBrainAgent
 
@@ -33,15 +33,10 @@ class SecondBrainApp(App):
             "Ketik pesan di bawah dan tekan Enter. Tekan q untuk keluar."
         ]
         
-        # Frame animasi goofy untuk status loading
-        self.loading_frames = [
-            "ヘ(°￢°)ノ *Agnes sedang mengendus-endus catatan Anda...*",
-            "┌|°_°|┘ *Agnes sedang joget koplo di background thread...*",
-            "(;°_°) *Agnes panik mencari file yang Anda maksud...*",
-            "ヘ(._.ヘ) *Agnes sedang merangkak menyusuri file markdown...*",
-            "ε=ε=┌(;°_°)┘ *Agnes berlari kencang mengambil data...*"
-        ]
-        self.current_frame_idx = 0
+        # Posisi & arah untuk animasi peselancar
+        self.surf_pos = 0
+        self.surf_dir = 1
+        self.surf_width = 30
 
         chat_log = self.query_one("#chat-log", Markdown)
         chat_log.update("\n\n".join(self.chat_history))
@@ -50,17 +45,29 @@ class SecondBrainApp(App):
         """Scroll chat log to the bottom."""
         chat_log.scroll_end(animate=False)
 
-    def animate_loading(self) -> None:
-        """Menggerakkan frame animasi goofy secara periodik."""
-        chat_log = self.query_one("#chat-log", Markdown)
+    def generate_surf_frame(self) -> str:
+        """Menghasilkan frame peselancar 🏄 yang bergerak bolak-balik."""
+        wave = "~" * self.surf_width
+        pos = self.surf_pos
         
-        if self.chat_history and self.chat_history[-1] in self.loading_frames:
-            self.chat_history.pop()
+        # Sisipkan surfer ke baris ombak
+        animated_wave = wave[:pos] + "🏄" + wave[pos+1:]
+        
+        # Update posisi surfer untuk frame selanjutnya
+        self.surf_pos += self.surf_dir
+        if self.surf_pos >= self.surf_width - 1:
+            self.surf_pos = self.surf_width - 1
+            self.surf_dir = -1
+        elif self.surf_pos <= 0:
+            self.surf_pos = 0
+            self.surf_dir = 1
             
-        self.current_frame_idx = (self.current_frame_idx + 1) % len(self.loading_frames)
-        self.chat_history.append(self.loading_frames[self.current_frame_idx])
-        chat_log.update("\n\n".join(self.chat_history))
-        self.scroll_chat_to_bottom(chat_log)
+        return f"🌊 {animated_wave} 🌊 [Tekan ESC untuk cancel]"
+
+    def animate_loading(self) -> None:
+        """Menggerakkan animasi peselancar secara periodik."""
+        loading_status = self.query_one("#loading-status", Label)
+        loading_status.update(self.generate_surf_frame())
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         user_text = event.value.strip()
@@ -69,19 +76,24 @@ class SecondBrainApp(App):
 
         chat_log = self.query_one("#chat-log", Markdown)
         chat_input = self.query_one("#chat-input", Input)
+        loading_status = self.query_one("#loading-status", Label)
 
         # Kunci input agar tidak bisa mengirim pesan ganda saat loading
         chat_input.disabled = True
 
         self.chat_history.append(f"### Anda\n{user_text}")
-        self.chat_history.append(self.loading_frames[0])
-
         chat_log.update("\n\n".join(self.chat_history))
         chat_input.value = ""
         self.scroll_chat_to_bottom(chat_log)
 
-        # Aktifkan animasi goofy setiap 0.4 detik
-        self.loading_timer = self.set_interval(0.4, self.animate_loading)
+        # Inisialisasi posisi & tampilkan pembatas loading
+        self.surf_pos = 0
+        self.surf_dir = 1
+        loading_status.display = True
+        loading_status.update(self.generate_surf_frame())
+
+        # Jalankan timer animasi surfer (setiap 0.1 detik untuk gerakan mulus)
+        self.loading_timer = self.set_interval(0.1, self.animate_loading)
 
         # Simpan reference worker agar bisa dibatalkan
         self.current_worker = self.run_worker(self.get_agent_response(user_text))
@@ -91,22 +103,20 @@ class SecondBrainApp(App):
         import asyncio
         chat_log = self.query_one("#chat-log", Markdown)
         chat_input = self.query_one("#chat-input", Input)
+        loading_status = self.query_one("#loading-status", Label)
 
         try:
             # Jalankan pemanggilan API AI di background thread
             response = await asyncio.to_thread(self.agent.ask, prompt)
             
-            # Matikan timer animasi
+            # Matikan timer & sembunyikan pembatas loading
             if hasattr(self, "loading_timer"):
                 self.loading_timer.stop()
+            loading_status.display = False
 
             # Aktifkan kembali input box
             chat_input.disabled = False
             chat_input.focus()
-
-            # Hapus frame loading terakhir
-            if self.chat_history and self.chat_history[-1] in self.loading_frames:
-                self.chat_history.pop()
 
             self.chat_history.append(f"### Agent\n{response}")
             chat_log.update("\n\n".join(self.chat_history))
@@ -146,6 +156,7 @@ class SecondBrainApp(App):
                 # Panel Bawah: AI Agent Chat
                 with Vertical(id="chat-area"):
                     yield Markdown(id="chat-log")
+                    yield Label("", id="loading-status")  # Label pembatas loading
                     yield Input(
                         placeholder="Tulis pesan ke Agent di sini...", id="chat-input"
                     )
@@ -163,20 +174,19 @@ class SecondBrainApp(App):
             # 1. Batalkan background worker
             self.current_worker.cancel()
 
-            # 2. Matikan timer animasi
+            # 2. Matikan timer & sembunyikan pembatas loading
             if hasattr(self, "loading_timer"):
                 self.loading_timer.stop()
+            
+            loading_status = self.query_one("#loading-status", Label)
+            loading_status.display = False
 
             # 3. Aktifkan kembali input box
             chat_input = self.query_one("#chat-input", Input)
             chat_input.disabled = False
             chat_input.focus()
 
-            # 4. Hapus frame loading
-            if self.chat_history and self.chat_history[-1] in self.loading_frames:
-                self.chat_history.pop()
-
-            self.chat_history.append("### Agent\n*(X) Pencarian dibatalkan oleh Anda (Agnes menangis tersedu-sedu di pojok terminal...)*")
+            self.chat_history.append("### Agent\n*(X) Pencarian dibatalkan oleh Anda (Agnes terjatuh dari papan selancar 🏄💥...)*")
             
             chat_log = self.query_one("#chat-log", Markdown)
             chat_log.update("\n\n".join(self.chat_history))
