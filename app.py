@@ -2,6 +2,8 @@ from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import DirectoryTree, Footer, Header, Input, RichLog
 
+from src.agent import SecondBrainAgent
+
 
 class SecondBrainApp(App):
     """Aplikasi TUI Utama dengan Layout & Interaksi Dasar."""
@@ -12,6 +14,42 @@ class SecondBrainApp(App):
         ("q", "quit", "Quit"),
         ("c", "clear_chat", "Clear Chat"),
     )
+
+    def on_mount(self) -> None:
+        self.agent = SecondBrainAgent()
+
+        chat_log = self.query_one("#chat-log", RichLog)
+        chat_log.write(
+            "[bold green]TUI Second Brain AI Agent Berhasil Aktif![/bold green]"
+        )
+        chat_log.write("Ketik pesan di bawah dan tekan Enter. Tekan q untuk keluar.")
+
+    def on_input_submitted(self, event: Input.Submitted) -> None:
+        user_text = event.value.strip()
+        if not user_text:
+            return
+
+        chat_log = self.query_one("#chat-log", RichLog)
+        chat_input = self.query_one("#chat-input", Input)
+
+        chat_log.write(f"\n[bold cyan]Anda:[/bold cyan] {user_text}")
+        chat_input.value = ""
+
+        chat_log.write("[italic gray]Agent sedang merespon...[/italic gray]")
+
+        self.run_worker(self.get_agent_response(user_text))
+
+    async def get_agent_response(self, prompt: str) -> None:
+        """Worker asinkron untuk mengambil jawaban dari AI di background."""
+        import asyncio
+
+        chat_log = self.query_one("#chat-log", RichLog)
+
+        # Jalankan pemanggilan API AI di background thread
+        response = await asyncio.to_thread(self.agent.ask, prompt)
+
+        # Tampilkan hasil jawaban AI ke layar chat log
+        chat_log.write(f"[bold magenta]Agent:[/bold magenta] {response}")
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -27,34 +65,6 @@ class SecondBrainApp(App):
                 )
 
         yield Footer()
-
-    def on_mount(self) -> None:
-        """Dipanggil saat aplikasi pertama kali terbuka di layar."""
-        chat_log = self.query_one("#chat-log", RichLog)
-        chat_log.write(
-            "[bold green]TUI Second Brain AI Agent Berhasil Aktif![/bold green]"
-        )
-        chat_log.write(
-            "Ketik pesan di bawah dan tekan [bold yellow]Enter[/bold yellow]. Tekan [bold yellow]q[/bold yellow] untuk keluar."
-        )
-
-    def on_input_submitted(self, event: Input.Submitted) -> None:
-        """Dipanggil saat user menekan Enter di kolom input."""
-        user_text = event.value.strip()
-        if not user_text:
-            return
-
-        chat_log = self.query_one("#chat-log", RichLog)
-        chat_input = self.query_one("#chat-input", Input)
-
-        # 1. Cetak teks ketikan user ke log chat
-        chat_log.write(f"\n[bold cyan]Anda:[/bold cyan] {user_text}")
-
-        # 2. Bersihkan kolom input
-        chat_input.value = ""
-
-        # 3. Jalankan efek "menunggu" respon AI di background
-        chat_log.write("[italic gray]Agent sedang merespon...[/italic gray]")
 
     def action_clear_chat(self) -> None:
         """Aksi ketika menekan tombol 'c' untuk membersihkan log chat."""
