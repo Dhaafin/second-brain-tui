@@ -18,10 +18,15 @@ class SecondBrainApp(App):
     BINDINGS = (
         ("q", "quit", "Quit"),
         ("c", "clear_chat", "Clear Chat"),
+        ("escape", "close_viewer", "Close Note"),
     )
 
     def on_mount(self) -> None:
         self.agent = SecondBrainAgent()
+
+        # Sembunyikan pembaca catatan di awal
+        note_viewer = self.query_one("#note-viewer", Markdown)
+        note_viewer.display = False
 
         chat_log = self.query_one("#chat-log", TextArea)
         chat_log.text = (
@@ -81,6 +86,7 @@ class SecondBrainApp(App):
                 content = file_path.read_text(encoding="utf-8", errors="ignore")
                 note_viewer = self.query_one("#note-viewer", Markdown)
                 note_viewer.update(content)
+                note_viewer.display = True  # Tampilkan panel pembaca catatan!
             except OSError:
                 pass
 
@@ -111,6 +117,11 @@ class SecondBrainApp(App):
     def action_clear_chat(self) -> None:
         """Aksi ketika menekan tombol 'c' untuk membersihkan log chat."""
         self.query_one("#chat-log", TextArea).text = ""
+
+    def action_close_viewer(self) -> None:
+        """Sembunyikan panel pembaca catatan."""
+        note_viewer = self.query_one("#note-viewer", Markdown)
+        note_viewer.display = False
 
 
 if __name__ == "__main__":

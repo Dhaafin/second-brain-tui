@@ -16,7 +16,8 @@
 }
 
 #note-viewer {
-    height: 60%;
+    display: none; /* Sembunyikan di awal */
+    height: 3fr;   /* 60% dari ruang vertikal jika ditampilkan */
     background: #1e293b; /* Slate 800 */
     color: #f8fafc;
     border: round #334155;
@@ -24,7 +25,7 @@
 }
 
 #chat-area {
-    height: 40%;
+    height: 2fr;   /* 40% tinggi jika ada note-viewer, 100% jika note-viewer disembunyikan */
     padding: 0 2 1 2;
 }
 
