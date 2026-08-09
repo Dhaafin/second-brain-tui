@@ -81,6 +81,23 @@ def append_note(base_dir_str: str, rel_path_str:str, text:str) -> str:
     except OSError:
         return f"Error: Failed to append to '{rel_path_str}' due to access"
          
+def delete_to_trash(vault_path:str, filename:str) -> str:
+    resolved_vault = Path(vault_path).resolve()
+    src_path = (resolved_vault / filename).resolve()
+
+    dest_path = (resolved_vault / ".trash" / filename).resolve()
+
+    if not src_path.is_relative_to(resolved_vault) or src_path == resolved_vault:
+        return "Error : Access denied. Cannot delete files outside of the vault"
+
+    try:
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+        import shutil
+        shutil.move(str(src_path), str(dest_path))
+        return f"Success: Moved '{filename}' to trash"
+    except OSError as e:
+        return f"Error: failed to move '{filename}' to trash due to access issues"
             
 
     
