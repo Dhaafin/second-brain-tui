@@ -5,10 +5,16 @@ def search_notes(vault_path: str, query: str) -> list[str]:
     """Search for keywords in all .md files in the Obsidian folder."""
     results = []
 
+    EXCLUDED_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".venv"}
+
     vault = Path(vault_path)
 
     for file_path in vault.rglob("*.md"):
         try:
+
+            if any(part in EXCLUDED_DIRS for part in file_path.parts):
+                continue
+            
             content = file_path.read_text(encoding="utf-8", errors="ignore")
 
             if (
