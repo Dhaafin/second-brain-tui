@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import DirectoryTree, Footer, Header, Input, Markdown, TextArea
+from textual.widgets import DirectoryTree, Footer, Header, Input, Markdown
 
 from src.agent import SecondBrainAgent
 
@@ -28,19 +28,15 @@ class SecondBrainApp(App):
         note_viewer = self.query_one("#note-viewer", Markdown)
         note_viewer.display = False
 
-        chat_log = self.query_one("#chat-log", TextArea)
-        chat_log.text = (
-            "TUI Second Brain AI Agent Berhasil Aktif!\n"
-            "Ketik pesan di bawah dan tekan Enter. Tekan q untuk keluar.\n"
-        )
+        self.chat_history = [
+            "# TUI Second Brain AI Agent Berhasil Aktif!",
+            "Ketik pesan di bawah dan tekan Enter. Tekan q untuk keluar."
+        ]
+        chat_log = self.query_one("#chat-log", Markdown)
+        chat_log.update("\n\n".join(self.chat_history))
 
-    def scroll_chat_to_bottom(self, chat_log: TextArea) -> None:
-        """Scroll chat log to the bottom by placing the cursor at the end."""
-        lines = chat_log.text.split("\n")
-        if lines:
-            last_line_idx = len(lines) - 1
-            last_char_idx = len(lines[-1])
-            chat_log.cursor_location = (last_line_idx, last_char_idx)
+    def scroll_chat_to_bottom(self, chat_log: Markdown) -> None:
+        """Scroll chat log to the bottom."""
         chat_log.scroll_end(animate=False)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -48,13 +44,14 @@ class SecondBrainApp(App):
         if not user_text:
             return
 
-        chat_log = self.query_one("#chat-log", TextArea)
+        chat_log = self.query_one("#chat-log", Markdown)
         chat_input = self.query_one("#chat-input", Input)
 
-        chat_log.text += f"\nAnda: {user_text}\n"
-        chat_input.value = ""
+        self.chat_history.append(f"### Anda\n{user_text}")
+        self.chat_history.append("*Agent sedang merespon...*")
 
-        chat_log.text += "Agent sedang merespon...\n"
+        chat_log.update("\n\n".join(self.chat_history))
+        chat_input.value = ""
         self.scroll_chat_to_bottom(chat_log)
 
         self.run_worker(self.get_agent_response(user_text))
@@ -63,18 +60,17 @@ class SecondBrainApp(App):
         """Worker asinkron untuk mengambil jawaban dari AI di background."""
         import asyncio
 
-        chat_log = self.query_one("#chat-log", TextArea)
+        chat_log = self.query_one("#chat-log", Markdown)
 
         # Jalankan pemanggilan API AI di background thread
         response = await asyncio.to_thread(self.agent.ask, prompt)
 
-        # Hapus status "sedang merespon" dan tampilkan jawaban AI asli
-        current_text = chat_log.text
-        if "Agent sedang merespon...\n" in current_text:
-            chat_log.text = current_text.replace("Agent sedang merespon...\n", f"Agent: {response}\n")
-        else:
-            chat_log.text += f"Agent: {response}\n"
+        # Hapus status "sedang merespon"
+        if self.chat_history and self.chat_history[-1] == "*Agent sedang merespon...*":
+            self.chat_history.pop()
 
+        self.chat_history.append(f"### Agent\n{response}")
+        chat_log.update("\n\n".join(self.chat_history))
         self.scroll_chat_to_bottom(chat_log)
 
     def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
@@ -107,7 +103,7 @@ class SecondBrainApp(App):
                 
                 # Panel Bawah: AI Agent Chat
                 with Vertical(id="chat-area"):
-                    yield TextArea(read_only=True, show_line_numbers=False, id="chat-log")
+                    yield Markdown(id="chat-log")
                     yield Input(
                         placeholder="Tulis pesan ke Agent di sini...", id="chat-input"
                     )
@@ -116,7 +112,8 @@ class SecondBrainApp(App):
 
     def action_clear_chat(self) -> None:
         """Aksi ketika menekan tombol 'c' untuk membersihkan log chat."""
-        self.query_one("#chat-log", TextArea).text = ""
+        self.chat_history = []
+        self.query_one("#chat-log", Markdown).update("")
 
     def action_close_viewer(self) -> None:
         """Sembunyikan panel pembaca catatan."""
