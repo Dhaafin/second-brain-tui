@@ -6,7 +6,8 @@ from openai import OpenAI
 
 from src.vault import read_note, search_notes
 
-load_dotenv()
+load_dotenv(".env.local")
+
 
 client = OpenAI(api_key=os.getenv("AI_API_KEY"), base_url=os.getenv("AI_BASE_URL"))
 
