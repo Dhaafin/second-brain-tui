@@ -136,6 +136,9 @@ class SecondBrainAgent:
     "3. Never say a note does not exist without searching for it first.\n"
     "4. If the user asks you to write or edit notes, check if similar notes exist first to maintain connections.\n"
     "5. Be concise and base your answers strictly on the retrieved note contents whenever possible."
+    "6. PARALLEL TOOL CALLS: If you need to read multiple notes, call `read_note` for ALL of them in a single turn. Do NOT call them one by one in sequence.\n"
+"7. SEARCH PREVIEWS: The `search_notes` tool returns the first 500 characters of each note. If this preview content is already sufficient to answer the user's question, answer immediately. Only call `read_note` if you need the full content."
+
 
         )
         self.messages = [
