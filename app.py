@@ -18,7 +18,7 @@ class SecondBrainApp(App):
     BINDINGS = (
         ("q", "quit", "Quit"),
         ("c", "clear_chat", "Clear Chat"),
-        ("escape", "close_viewer", "Close Note"),
+        ("escape", "close_viewer", "Close Note / Cancel Agent"),
     )
 
     def on_mount(self) -> None:
@@ -32,12 +32,35 @@ class SecondBrainApp(App):
             "# TUI Second Brain AI Agent Berhasil Aktif!",
             "Ketik pesan di bawah dan tekan Enter. Tekan q untuk keluar."
         ]
+        
+        # Frame animasi goofy untuk status loading
+        self.loading_frames = [
+            "ヘ(°￢°)ノ *Agnes sedang mengendus-endus catatan Anda...*",
+            "┌|°_°|┘ *Agnes sedang joget koplo di background thread...*",
+            "(;°_°) *Agnes panik mencari file yang Anda maksud...*",
+            "ヘ(._.ヘ) *Agnes sedang merangkak menyusuri file markdown...*",
+            "ε=ε=┌(;°_°)┘ *Agnes berlari kencang mengambil data...*"
+        ]
+        self.current_frame_idx = 0
+
         chat_log = self.query_one("#chat-log", Markdown)
         chat_log.update("\n\n".join(self.chat_history))
 
     def scroll_chat_to_bottom(self, chat_log: Markdown) -> None:
         """Scroll chat log to the bottom."""
         chat_log.scroll_end(animate=False)
+
+    def animate_loading(self) -> None:
+        """Menggerakkan frame animasi goofy secara periodik."""
+        chat_log = self.query_one("#chat-log", Markdown)
+        
+        if self.chat_history and self.chat_history[-1] in self.loading_frames:
+            self.chat_history.pop()
+            
+        self.current_frame_idx = (self.current_frame_idx + 1) % len(self.loading_frames)
+        self.chat_history.append(self.loading_frames[self.current_frame_idx])
+        chat_log.update("\n\n".join(self.chat_history))
+        self.scroll_chat_to_bottom(chat_log)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         user_text = event.value.strip()
@@ -47,31 +70,50 @@ class SecondBrainApp(App):
         chat_log = self.query_one("#chat-log", Markdown)
         chat_input = self.query_one("#chat-input", Input)
 
+        # Kunci input agar tidak bisa mengirim pesan ganda saat loading
+        chat_input.disabled = True
+
         self.chat_history.append(f"### Anda\n{user_text}")
-        self.chat_history.append("*Agent sedang merespon...*")
+        self.chat_history.append(self.loading_frames[0])
 
         chat_log.update("\n\n".join(self.chat_history))
         chat_input.value = ""
         self.scroll_chat_to_bottom(chat_log)
 
-        self.run_worker(self.get_agent_response(user_text))
+        # Aktifkan animasi goofy setiap 0.4 detik
+        self.loading_timer = self.set_interval(0.4, self.animate_loading)
+
+        # Simpan reference worker agar bisa dibatalkan
+        self.current_worker = self.run_worker(self.get_agent_response(user_text))
 
     async def get_agent_response(self, prompt: str) -> None:
         """Worker asinkron untuk mengambil jawaban dari AI di background."""
         import asyncio
-
         chat_log = self.query_one("#chat-log", Markdown)
+        chat_input = self.query_one("#chat-input", Input)
 
-        # Jalankan pemanggilan API AI di background thread
-        response = await asyncio.to_thread(self.agent.ask, prompt)
+        try:
+            # Jalankan pemanggilan API AI di background thread
+            response = await asyncio.to_thread(self.agent.ask, prompt)
+            
+            # Matikan timer animasi
+            if hasattr(self, "loading_timer"):
+                self.loading_timer.stop()
 
-        # Hapus status "sedang merespon"
-        if self.chat_history and self.chat_history[-1] == "*Agent sedang merespon...*":
-            self.chat_history.pop()
+            # Aktifkan kembali input box
+            chat_input.disabled = False
+            chat_input.focus()
 
-        self.chat_history.append(f"### Agent\n{response}")
-        chat_log.update("\n\n".join(self.chat_history))
-        self.scroll_chat_to_bottom(chat_log)
+            # Hapus frame loading terakhir
+            if self.chat_history and self.chat_history[-1] in self.loading_frames:
+                self.chat_history.pop()
+
+            self.chat_history.append(f"### Agent\n{response}")
+            chat_log.update("\n\n".join(self.chat_history))
+            self.scroll_chat_to_bottom(chat_log)
+        except asyncio.CancelledError:
+            # Penanganan pembatalan sudah di-handle oleh action_close_viewer
+            pass
 
     def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
         """Handler ketika file di-klik di sidebar explorer."""
@@ -116,9 +158,33 @@ class SecondBrainApp(App):
         self.query_one("#chat-log", Markdown).update("")
 
     def action_close_viewer(self) -> None:
-        """Sembunyikan panel pembaca catatan."""
-        note_viewer = self.query_one("#note-viewer", Markdown)
-        note_viewer.display = False
+        """Sembunyikan panel pembaca catatan ATAU batalkan pencarian Agent jika sedang berjalan."""
+        if hasattr(self, "current_worker") and self.current_worker.is_running:
+            # 1. Batalkan background worker
+            self.current_worker.cancel()
+
+            # 2. Matikan timer animasi
+            if hasattr(self, "loading_timer"):
+                self.loading_timer.stop()
+
+            # 3. Aktifkan kembali input box
+            chat_input = self.query_one("#chat-input", Input)
+            chat_input.disabled = False
+            chat_input.focus()
+
+            # 4. Hapus frame loading
+            if self.chat_history and self.chat_history[-1] in self.loading_frames:
+                self.chat_history.pop()
+
+            self.chat_history.append("### Agent\n*(X) Pencarian dibatalkan oleh Anda (Agnes menangis tersedu-sedu di pojok terminal...)*")
+            
+            chat_log = self.query_one("#chat-log", Markdown)
+            chat_log.update("\n\n".join(self.chat_history))
+            self.scroll_chat_to_bottom(chat_log)
+        else:
+            # Sembunyikan panel Note Viewer
+            note_viewer = self.query_one("#note-viewer", Markdown)
+            note_viewer.display = False
 
 
 if __name__ == "__main__":
