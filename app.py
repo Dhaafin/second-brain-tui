@@ -66,12 +66,21 @@ class SecondBrainApp(App):
             self.surf_pos = 0
             self.surf_dir = 1
             
-        return f"🌊 {animated_wave} 🌊 [Tekan ESC untuk cancel]"
+        return f"🌊 {animated_wave} 🌊"
 
     def animate_loading(self) -> None:
-        """Menggerakkan animasi peselancar secara periodik."""
+        """Menggerakkan animasi peselancar & stopwatch secara periodik."""
         loading_status = self.query_one("#loading-status", Label)
-        loading_status.update(self.generate_surf_frame())
+        self.elapsed_time += 0.1
+        
+        # Efek titik-titik loading bergerak (cycle setiap 0.5 detik)
+        dots = "." * (int(self.elapsed_time * 2) % 3 + 1)
+        dots_fixed = dots.ljust(3, " ")  # Lebar tetap agar teks tidak geser/bergetar
+        
+        wave_part = self.generate_surf_frame()
+        loading_status.update(
+            f"{wave_part} | Agnes is thinking{dots_fixed} ({self.elapsed_time:.1f}s) | [ESC to Cancel]"
+        )
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         user_text = event.value.strip()
@@ -93,10 +102,10 @@ class SecondBrainApp(App):
         # Inisialisasi posisi & tampilkan pembatas loading
         self.surf_pos = 0
         self.surf_dir = 1
+        self.elapsed_time = 0.0
         loading_status.display = True
-        loading_status.update(self.generate_surf_frame())
 
-        # Jalankan timer animasi surfer (setiap 0.1 detik untuk gerakan mulus)
+        # Jalankan timer animasi surfer & stopwatch (setiap 0.1 detik)
         self.loading_timer = self.set_interval(0.1, self.animate_loading)
 
         # Simpan reference worker agar bisa dibatalkan
