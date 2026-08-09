@@ -72,6 +72,18 @@ class SecondBrainApp(App):
 
         self.scroll_chat_to_bottom(chat_log)
 
+    def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
+        """Handler ketika file di-klik di sidebar explorer."""
+        file_path = event.path
+        # Membaca file jika tipenya teks atau markdown
+        if file_path.suffix.lower() in (".md", ".txt", ".json", ".py", ".tcss", ".env", ".local"):
+            try:
+                content = file_path.read_text(encoding="utf-8", errors="ignore")
+                note_viewer = self.query_one("#note-viewer", TextArea)
+                note_viewer.text = content
+            except OSError:
+                pass
+
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
 
@@ -80,11 +92,21 @@ class SecondBrainApp(App):
             with Vertical(id="sidebar"):
                 yield DirectoryTree(path=vault_path, id="file-tree")
 
-            with Vertical(id="chat-area"):
-                yield TextArea(read_only=True, show_line_numbers=False, id="chat-log")
-                yield Input(
-                    placeholder="Tulis pesan ke Agent di sini...", id="chat-input"
+            with Vertical(id="main-content"):
+                # Panel Atas: Viewer Catatan Obsidian
+                yield TextArea(
+                    read_only=True,
+                    show_line_numbers=False,
+                    id="note-viewer",
+                    placeholder="Pilih file catatan di sidebar kiri untuk membacanya di sini..."
                 )
+                
+                # Panel Bawah: AI Agent Chat
+                with Vertical(id="chat-area"):
+                    yield TextArea(read_only=True, show_line_numbers=False, id="chat-log")
+                    yield Input(
+                        placeholder="Tulis pesan ke Agent di sini...", id="chat-input"
+                    )
 
         yield Footer()
 

@@ -10,10 +10,22 @@
     border: none;
 }
 
-#chat-area {
+#main-content {
     width: 70%;
     height: 100%;
-    padding: 1 2;
+}
+
+#note-viewer {
+    height: 60%;
+    background: #1e293b; /* Slate 800 */
+    color: #f8fafc;
+    border: round #334155;
+    margin: 1 2 0 2;
+}
+
+#chat-area {
+    height: 40%;
+    padding: 0 2 1 2;
 }
 
 #chat-log {
