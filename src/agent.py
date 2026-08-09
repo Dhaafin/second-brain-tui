@@ -152,7 +152,7 @@ class SecondBrainAgent:
         ]
 
 
-    def ask(self, user_message: str) -> str:
+    def ask(self, user_message: str, on_status_update=None) -> str:
         """Send a message to the AI and run the tool call loop if necessary"""
 
         self.messages.append({"role": "user","content": user_message})
@@ -176,6 +176,8 @@ class SecondBrainAgent:
 
                 if function_name == "search_notes":
                     query = function_args.get("query")
+                    if on_status_update:
+                        on_status_update(f"searching notes for '{query}'")
                     search_results = search_notes(self.vault_path, query)
                     tool_output = (
                         "\n".join(search_results)
@@ -185,24 +187,34 @@ class SecondBrainAgent:
 
                 elif function_name == "delete_to_trash":
                     filename =function_args.get("filename")
+                    if on_status_update:
+                        on_status_update(f"deleting '{filename}' to trash")
                     tool_output = delete_to_trash(self.vault_path, filename)
 
                 elif function_name == "restore_from_trash":
                     filename =function_args.get("filename")
+                    if on_status_update:
+                        on_status_update(f"restoring '{filename}' from trash")
                     tool_output = restore_from_trash(self.vault_path, filename)
 
                 elif function_name == "read_note":
                     filename = function_args.get("filename")
+                    if on_status_update:
+                        on_status_update(f"reading note '{filename}'")
                     tool_output = read_note(self.vault_path, filename)
 
                 elif function_name == "write_note":
                     filename = function_args.get("filename")
                     content = function_args.get ("content")
+                    if on_status_update:
+                        on_status_update(f"writing note '{filename}'")
                     tool_output = write_note(self.vault_path, filename, content)
 
                 elif function_name == "append_note":
                     filename = function_args.get("filename")
                     content = function_args.get ("content")
+                    if on_status_update:
+                        on_status_update(f"appending to '{filename}'")
                     tool_output = append_note(self.vault_path, filename, content)
 
                 else:

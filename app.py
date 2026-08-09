@@ -78,8 +78,11 @@ class SecondBrainApp(App):
         dots_fixed = dots.ljust(3, " ")  # Lebar tetap agar teks tidak geser/bergetar
         
         wave_part = self.generate_surf_frame()
+        # Dapatkan status terakhir dari agen, default "is thinking"
+        current_status = getattr(self, "current_agent_status", "is thinking")
+        
         loading_status.update(
-            f"{wave_part} | Agnes is thinking{dots_fixed} ({self.elapsed_time:.1f}s) | [ESC to Cancel]"
+            f"{wave_part} | Agnes {current_status}{dots_fixed} ({self.elapsed_time:.1f}s) | [ESC to Cancel]"
         )
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
@@ -103,6 +106,7 @@ class SecondBrainApp(App):
         self.surf_pos = 0
         self.surf_dir = 1
         self.elapsed_time = 0.0
+        self.current_agent_status = "is thinking"
         loading_status.display = True
 
         # Jalankan timer animasi surfer & stopwatch (setiap 0.1 detik)
@@ -119,8 +123,12 @@ class SecondBrainApp(App):
         loading_status = self.query_one("#loading-status", Label)
 
         try:
+            # Callback untuk memperbarui status agen
+            def update_status(status_text: str):
+                self.current_agent_status = status_text
+
             # Jalankan pemanggilan API AI di background thread
-            response = await asyncio.to_thread(self.agent.ask, prompt)
+            response = await asyncio.to_thread(self.agent.ask, prompt, update_status)
             
             # Matikan timer & sembunyikan pembatas loading
             if hasattr(self, "loading_timer"):
