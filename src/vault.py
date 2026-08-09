@@ -14,7 +14,7 @@ def search_notes(vault_path: str, query: str) -> list[str]:
 
             if any(part in EXCLUDED_DIRS for part in file_path.parts):
                 continue
-            
+
             content = file_path.read_text(encoding="utf-8", errors="ignore")
 
             if (
@@ -30,14 +30,19 @@ def search_notes(vault_path: str, query: str) -> list[str]:
 
 def read_note(vault_path: str, filename: str) -> str:
     """Read the full contents of a log file based on its name."""
-    vault = Path(vault_path)
+    resolved_vault = Path(vault_path).resolve()
 
-    matching_files = list(vault.rglob(filename))
+    matching_files = list(resolved_vault.rglob(filename))
 
     if not matching_files:
         return f"Error: Notes '{filename}' is not found."
 
+    resolved_file = matching_files[0].resolve()
+
+    if not resolved_file.is_relative_to(resolved_vault):
+        return "Error: Access denied. File is outside the vault."
+
     try:
-        return matching_files[0].read_text(encoding="utf-8", errors="ignore")
+        return resolved_file.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return f"Error: Failed to read '{filename}' due to access rights issues."
