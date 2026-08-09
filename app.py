@@ -1,8 +1,13 @@
+import os
+from dotenv import load_dotenv
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import DirectoryTree, Footer, Header, Input, TextArea
 
 from src.agent import SecondBrainAgent
+
+# Load environment variables
+load_dotenv(".env.local")
 
 
 class SecondBrainApp(App):
@@ -70,9 +75,10 @@ class SecondBrainApp(App):
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
 
+        vault_path = os.getenv("OBSIDIAN_PATH", ".")
         with Horizontal():
             with Vertical(id="sidebar"):
-                yield DirectoryTree(path=".", id="file-tree")
+                yield DirectoryTree(path=vault_path, id="file-tree")
 
             with Vertical(id="chat-area"):
                 yield TextArea(read_only=True, show_line_numbers=False, id="chat-log")
