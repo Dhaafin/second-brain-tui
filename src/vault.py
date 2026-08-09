@@ -100,8 +100,8 @@ def delete_to_trash(vault_path:str, filename:str) -> str:
 
 def restore_from_trash(vault_path:str, filename:str) -> str:
     resolved_vault = Path(vault_path).resolve()
-    src_path = (resolved_vault / filename).resolve()
-    dest_path = (resolved_vault / ".trash" / filename).resolve()
+    src_path = (resolved_vault / ".trash" / filename).resolve()
+    dest_path = (resolved_vault / filename).resolve()
 
     if not src_path.exists():
         return f"Error: '{filename}' not found in trash."
