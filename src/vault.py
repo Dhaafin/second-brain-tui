@@ -84,7 +84,6 @@ def append_note(base_dir_str: str, rel_path_str:str, text:str) -> str:
 def delete_to_trash(vault_path:str, filename:str) -> str:
     resolved_vault = Path(vault_path).resolve()
     src_path = (resolved_vault / filename).resolve()
-
     dest_path = (resolved_vault / ".trash" / filename).resolve()
 
     if not src_path.is_relative_to(resolved_vault) or src_path == resolved_vault:
@@ -98,6 +97,23 @@ def delete_to_trash(vault_path:str, filename:str) -> str:
         return f"Success: Moved '{filename}' to trash"
     except OSError as e:
         return f"Error: failed to move '{filename}' to trash due to access issues"
+
+def restore_from_trash(vault_path:str, filename:str) -> str:
+    resolved_vault = Path(vault_path).resolve()
+    src_path = (resolved_vault / filename).resolve()
+    dest_path = (resolved_vault / ".trash" / filename).resolve()
+
+    if not src_path.exists():
+        return f"Error: '{filename}' not found in trash."
+    
+    try:
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+        import shutil
+        shutil.move(str(src_path), str(dest_path))
+        return f"Success: Restored '{filename}' from trash."
+    except OSError as e:
+        return f"Error: Failed to restore '{filename}' due to access issues."
             
 
     
