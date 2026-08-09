@@ -29,8 +29,8 @@ class SecondBrainApp(App):
         note_viewer.display = False
 
         self.chat_history = [
-            "# TUI Second Brain AI Agent Berhasil Aktif!",
-            "Ketik pesan di bawah dan tekan Enter. Tekan q untuk keluar."
+            "# TUI Second Brain AI Agent Active!",
+            "Type a message below and press Enter. Press Q to exit."
         ]
         
         # Posisi & arah untuk animasi peselancar
@@ -94,7 +94,7 @@ class SecondBrainApp(App):
         # Kunci input agar tidak bisa mengirim pesan ganda saat loading
         chat_input.disabled = True
 
-        self.chat_history.append(f"### Anda\n{user_text}")
+        self.chat_history.append(f"### You\n{user_text}")
         chat_log.update("\n\n".join(self.chat_history))
         chat_input.value = ""
         self.scroll_chat_to_bottom(chat_log)
@@ -160,9 +160,9 @@ class SecondBrainApp(App):
                 yield DirectoryTree(path=vault_path, id="file-tree")
 
             with Vertical(id="main-content"):
-                # Panel Atas: Viewer Catatan Obsidian (Formatted Markdown)
+                # Top Panel: Obsidian Note Viewer (Formatted Markdown)
                 yield Markdown(
-                    "# Pilih Catatan\n\nSilakan pilih file catatan di sidebar kiri untuk membacanya di sini...",
+                    "# Select a Note\n\nPlease select a note from the left sidebar to read it here...",
                     id="note-viewer"
                 )
                 
@@ -171,7 +171,7 @@ class SecondBrainApp(App):
                     yield Markdown(id="chat-log")
                     yield Label("", id="loading-status")  # Label pembatas loading
                     yield Input(
-                        placeholder="Tulis pesan ke Agent di sini...", id="chat-input"
+                        placeholder="Type a message to the Agent here...", id="chat-input"
                     )
 
         yield Footer()
@@ -199,7 +199,7 @@ class SecondBrainApp(App):
             chat_input.disabled = False
             chat_input.focus()
 
-            self.chat_history.append("### Agent\n*(X) Pencarian dibatalkan oleh Anda (Agnes terjatuh dari papan selancar 🏄💥...)*")
+            self.chat_history.append("### Agent\n*(X) Search cancelled by user (Agnes fell off her surfboard 🏄💥...)*")
             
             chat_log = self.query_one("#chat-log", Markdown)
             chat_log.update("\n\n".join(self.chat_history))

@@ -95,7 +95,7 @@ class SecondBrainAgent:
                     tool_output = read_note(self.vault_path, filename)
 
                 else:
-                    tool_output = f"Error: Tool '{function_name}' tidak ditemukan."
+                    tool_output = f"Error: Tool '{function_name}' not found."
                 messages.append(
                     {
                         "tool_call_id": tool_call.id,
