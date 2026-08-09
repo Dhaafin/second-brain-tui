@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import DirectoryTree, Footer, Header, Input, TextArea
+from textual.widgets import DirectoryTree, Footer, Header, Input, Markdown, TextArea
 
 from src.agent import SecondBrainAgent
 
@@ -79,8 +79,8 @@ class SecondBrainApp(App):
         if file_path.suffix.lower() in (".md", ".txt", ".json", ".py", ".tcss", ".env", ".local"):
             try:
                 content = file_path.read_text(encoding="utf-8", errors="ignore")
-                note_viewer = self.query_one("#note-viewer", TextArea)
-                note_viewer.text = content
+                note_viewer = self.query_one("#note-viewer", Markdown)
+                note_viewer.update(content)
             except OSError:
                 pass
 
@@ -93,12 +93,10 @@ class SecondBrainApp(App):
                 yield DirectoryTree(path=vault_path, id="file-tree")
 
             with Vertical(id="main-content"):
-                # Panel Atas: Viewer Catatan Obsidian
-                yield TextArea(
-                    read_only=True,
-                    show_line_numbers=False,
-                    id="note-viewer",
-                    placeholder="Pilih file catatan di sidebar kiri untuk membacanya di sini..."
+                # Panel Atas: Viewer Catatan Obsidian (Formatted Markdown)
+                yield Markdown(
+                    "# Pilih Catatan\n\nSilakan pilih file catatan di sidebar kiri untuk membacanya di sini...",
+                    id="note-viewer"
                 )
                 
                 # Panel Bawah: AI Agent Chat
