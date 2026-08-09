@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from src.vault import append_note, read_note, read_note, search_notes
+from src.vault import append_note, read_note, write_note, search_notes
 
 load_dotenv(".env.local")
 
