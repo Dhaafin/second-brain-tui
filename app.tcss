@@ -1,0 +1,36 @@
+#sidebar {
+    width: 30%;
+    height: 100%;
+    background: #1e293b; /* Slate 800 */
+    border-right: tall #334155; /* Garis vertikal pembatas */
+}
+
+#file-tree {
+    background: transparent;
+    border: none;
+}
+
+#chat-area {
+    width: 70%;
+    height: 100%;
+    padding: 1 2;
+}
+
+#chat-log {
+    height: 1fr;
+    background: #090d16;
+    border: round #475569;
+    padding: 1 2;
+}
+
+#chat-input {
+    height: 3;
+    background: #1e293b;
+    border: tall #6366f1; /* Neon indigo */
+    color: #f8fafc;
+    margin-top: 1;
+}
+
+#chat-input:focus {
+    border: double #a5b4fc;
+}

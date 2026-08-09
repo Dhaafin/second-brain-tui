@@ -1,0 +1,23 @@
+# Python bytecode & cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ruff_cache/
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Environment Variables & Secrets (Kunci API)
+.env
+.env.local
+
+# OS Files
+Thumbs.db
+db.sqlite3
+.DS_Store
+
+# AI Agents
+.agents
