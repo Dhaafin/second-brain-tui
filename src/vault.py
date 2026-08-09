@@ -46,3 +46,41 @@ def read_note(vault_path: str, filename: str) -> str:
         return resolved_file.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return f"Error: Failed to read '{filename}' due to access rights issues."
+
+def write_note(base_dir_str : str, rel_path_str: str, text: str) -> str:
+    base_dir = Path(base_dir_str).resolve()
+
+    target_file= (base_dir / rel_path_str).resolve()
+
+    if not target_file.is_relative_to(base_dir):
+        return "Error: Access denied. Target path is outside the sandbox"
+
+    try:
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        target_file.write_text(text, encoding="utf-8")
+
+        return f"Success: Note '{rel_path_str}' has been saved."
+    except OSError:
+        return f"Error: Failed to write '{rel_path_str}' due to access issues."
+
+def append_note(base_dir_str: str, rel_path_str:str, text:str) -> str:
+    base_dir =Path(base_dir_str).resolve()
+    target_file = (base_dir/rel_path_str).resolve()
+
+    if not target_file.is_relative_to(base_dir):
+        return "Error: Access denied. Target path is outside the sandbox"
+
+    try:
+        target_file.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(target_file, "a", encoding="utf-8") as f:
+            f.write ("\n" + text)
+            
+        return f"Success: Content Appended to '{rel_path_str}'"
+    except OSError:
+        return f"Error: Failed to append to '{rel_path_str}' due to access"
+         
+            
+
+    
