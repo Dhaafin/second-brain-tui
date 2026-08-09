@@ -164,7 +164,26 @@ class SecondBrainAgent:
 
             response_message = response.choices[0].message
 
-            self.messages.append(response_message)
+            # Convert response message to a clean dictionary to remove non-standard/extra fields (like reasoning_content)
+            # that cause API gateways to reject the request body with a 400 Bad Request error.
+            clean_message = {
+                "role": "assistant"
+            }
+            if response_message.content is not None:
+                clean_message["content"] = response_message.content
+            if response_message.tool_calls:
+                clean_message["tool_calls"] = [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.function.name,
+                            "arguments": tc.function.arguments,
+                        }
+                    }
+                    for tc in response_message.tool_calls
+                ]
+            self.messages.append(clean_message)
 
             if not response_message.tool_calls:
                 return response_message.content or "No response from AI."
