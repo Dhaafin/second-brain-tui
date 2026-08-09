@@ -37,6 +37,8 @@ class SecondBrainApp(App):
         self.surf_pos = 0
         self.surf_dir = 1
         self.surf_width = 30
+        self.wave_offset = 0
+        self.wave_chars = "~≈∽≈"
 
         chat_log = self.query_one("#chat-log", Markdown)
         chat_log.update("\n\n".join(self.chat_history))
@@ -46,10 +48,12 @@ class SecondBrainApp(App):
         chat_log.scroll_end(animate=False)
 
     def generate_surf_frame(self) -> str:
-        """Menghasilkan frame peselancar 🏄 yang bergerak bolak-balik."""
-        wave = "~" * self.surf_width
-        pos = self.surf_pos
+        """Menghasilkan frame peselancar 🏄 yang bergerak bolak-balik di atas ombak mengalir."""
+        # Geser pola ombak ke kanan berdasarkan offset
+        wave = "".join(self.wave_chars[(i - self.wave_offset) % len(self.wave_chars)] for i in range(self.surf_width))
+        self.wave_offset = (self.wave_offset + 1) % len(self.wave_chars)
         
+        pos = self.surf_pos
         # Sisipkan surfer ke baris ombak
         animated_wave = wave[:pos] + "🏄" + wave[pos+1:]
         
