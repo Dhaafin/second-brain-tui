@@ -134,6 +134,7 @@ class SecondBrainApp(App):
             self.chat_history.append(f"### Agent\n{response}")
             chat_log.update("\n\n".join(self.chat_history))
             self.scroll_chat_to_bottom(chat_log)
+            self.query_one("#file-tree", DirectoryTree).reload()
         except asyncio.CancelledError:
             # Penanganan pembatalan sudah di-handle oleh action_close_viewer
             pass
@@ -179,6 +180,7 @@ class SecondBrainApp(App):
     def action_clear_chat(self) -> None:
         """Aksi ketika menekan tombol 'c' untuk membersihkan log chat."""
         self.chat_history = []
+        self.agent.clear_history()
         self.query_one("#chat-log", Markdown).update("")
 
     def action_close_viewer(self) -> None:
