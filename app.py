@@ -26,7 +26,7 @@ class SecondBrainApp(App):
 
     def scroll_chat_to_bottom(self, chat_log: TextArea) -> None:
         """Scroll chat log to the bottom by placing the cursor at the end."""
-        lines = chat_log.lines
+        lines = chat_log.text.split("\n")
         if lines:
             last_line_idx = len(lines) - 1
             last_char_idx = len(lines[-1])
