@@ -30,28 +30,19 @@ def _ensure_cache_loaded(vault_path: str) -> None:
     _cache_loaded = True
 
 def search_notes(vault_path: str, query: str) -> list[str]:
-    """Search for keywords in all .md files in the Obsidian folder."""
+    """Search for keywords in all cached .md files in the Obsidian folder."""
+
+    _ensure_cache_loaded(vault_path)
+    
     results = []
+    query_lower = query.lower()
 
-    EXCLUDED_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".venv"}
+    for rel_path, content in _notes_cache.items():
+        filename = Path(rel_path).name
 
-    vault = Path(vault_path)
-
-    for file_path in vault.rglob("*.md"):
-        try:
-
-            if any(part in EXCLUDED_DIRS for part in file_path.parts):
-                continue
-
-            content = file_path.read_text(encoding="utf-8", errors="ignore")
-
-            if (
-                query.lower() in file_path.name.lower()
-                or query.lower() in content.lower()
-            ):
-                results.append(f"File: {file_path.name}\nIsi:\n{content[:500]}...\n")
-        except OSError:
-            continue
+        if query_lower in filename.lower() or query_lower in content.lower():
+            preview = content[:500]
+            results.append(f"File '{rel_path}'\nContent:\n{preview}")
 
     return results
 
