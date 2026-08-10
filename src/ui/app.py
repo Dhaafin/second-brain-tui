@@ -22,9 +22,11 @@ class SecondBrainApp(App):
         ("escape", "close_viewer", "Close Note / Cancel Agent"),
     )
 
-    def on_mount(self) -> None:
+    def __init__(self) -> None:
+        super().__init__()
         self.agent = SecondBrainAgent()
 
+    def on_mount(self) -> None:
         # Sembunyikan container pembaca catatan di awal
         self.query_one("#note-viewer-container").display = False
 
