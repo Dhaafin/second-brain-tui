@@ -8,12 +8,20 @@ class FocusableMarkdown(Markdown):
     """Markdown widget that can accept focus for keyboard scrolling."""
     can_focus = True
 
+class ChatInput(Input):
+    """Custom Input with standard selection and cursor bindings."""
+    BINDINGS = [
+        ("ctrl+a", "select_all", "Select All"),
+        ("ctrl+home", "home(True)", "Select to Start"),
+        ("ctrl+end", "end(True)", "Select to End"),
+    ]
+
 class ChatPanel(Vertical):
     def compose(self):
         yield FocusableMarkdown(id="chat-log")
         yield Label("", id="loading-status")
         yield OptionList(id="mention-autocomplete")
-        yield Input(
+        yield ChatInput(
             placeholder="Type a message to the Agent here...", id="chat-input"
         )
 
