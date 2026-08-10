@@ -79,6 +79,8 @@ def write_note(base_dir_str : str, rel_path_str: str, text: str) -> str:
         
         target_file.write_text(text, encoding="utf-8")
 
+        _notes_cache[rel_path_str] = text
+
         return f"Success: Note '{rel_path_str}' has been saved."
     except OSError:
         return f"Error: Failed to write '{rel_path_str}' due to access issues."
@@ -95,6 +97,11 @@ def append_note(base_dir_str: str, rel_path_str:str, text:str) -> str:
 
         with open(target_file, "a", encoding="utf-8") as f:
             f.write ("\n" + text)
+
+        if rel_path_str in _notes_cache:
+            _notes_cache[rel_path_str] += "\n" + text
+        else:
+            _notes_cache[rel_path_str] = text
             
         return f"Success: Content Appended to '{rel_path_str}'"
     except OSError:
@@ -113,6 +120,9 @@ def delete_to_trash(vault_path:str, filename:str) -> str:
 
         import shutil
         shutil.move(str(src_path), str(dest_path))
+
+        _notes_cache.pop(filename, None)
+
         return f"Success: Moved '{filename}' to trash"
     except OSError as e:
         return f"Error: failed to move '{filename}' to trash due to access issues"
@@ -130,6 +140,13 @@ def restore_from_trash(vault_path:str, filename:str) -> str:
 
         import shutil
         shutil.move(str(src_path), str(dest_path))
+
+        try: 
+            content = dest_path.read_text(encoding="utf-8", errors="ignore")
+            _notes_cache[filename] = content
+        except OSError:
+            pass
+
         return f"Success: Restored '{filename}' from trash."
     except OSError as e:
         return f"Error: Failed to restore '{filename}' due to access issues."
