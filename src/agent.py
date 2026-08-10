@@ -4,7 +4,7 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from src.vault import append_note, read_note, write_note, search_notes, delete_to_trash, restore_from_trash
+from src.vault import append_note, read_note, write_note, search_notes, delete_to_trash, restore_from_trash, list_vault_directory
 
 load_dotenv(".env.local")
 
@@ -119,6 +119,17 @@ AI_TOOLS = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "list_vault_directory",
+            "description": "List all active folder paths in the user's vault to inspect the directory structure before writing notes.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+            },
+        },
+    },
 ]
 
 
@@ -193,7 +204,13 @@ class SecondBrainAgent:
 
                 function_args = json.loads(tool_call.function.arguments)
 
-                if function_name == "search_notes":
+                if function_name == "list_vault_directory":
+                    if on_status_update:
+                        on_status_update("listing vault directories")
+                    dirs = list_vault_directory(self.vault_path)
+                    tool_output = "\n".join(dirs) if dirs else "No directories found"
+
+                elif function_name == "search_notes":
                     query = function_args.get("query")
                     if on_status_update:
                         on_status_update(f"searching notes for '{query}'")
