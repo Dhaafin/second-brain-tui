@@ -138,6 +138,7 @@ class SecondBrainAgent:
     def __init__(self):
         self.vault_path = os.getenv("OBSIDIAN_PATH")
         self.model = os.getenv("AI_MODEL")
+        self.max_steps = int(os.getenv("AI_MAX_STEPS", 10))
 
         self.system_prompt = (
             
@@ -272,7 +273,7 @@ class SecondBrainAgent:
 
         self.messages.append({"role": "user", "content": user_message_to_send})
 
-        for _ in range(5):
+        for _ in range(self.max_steps):
             response = client.chat.completions.create(
                 model=self.model, messages=self.messages, tools=AI_TOOLS, tool_choice="auto"
             )
