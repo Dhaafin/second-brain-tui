@@ -167,6 +167,11 @@ def restore_from_trash(vault_path:str, filename:str) -> str:
         return f"Success: Restored '{filename}' from trash."
     except OSError as e:
         return f"Error: Failed to restore '{filename}' due to access issues."
+
+def get_all_note_paths(vault_path: str) -> list[str]:
+    """Retrieve all cached note paths from the vault."""
+    _ensure_cache_loaded(vault_path)
+    return list(_notes_cache.keys())
             
 
     

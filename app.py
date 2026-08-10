@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Button, DirectoryTree, Footer, Header, Input, Label, Markdown
+from textual.widgets import Button, DirectoryTree, Footer, Header, Input, Label, Markdown, OptionList
 
 from src.agent import SecondBrainAgent
 
@@ -31,6 +31,7 @@ class SecondBrainApp(App):
 
         # Sembunyikan container pembaca catatan di awal
         self.query_one("#note-viewer-container").display = False
+        self.query_one("#mention-autocomplete").display = False
 
         self.chat_history = [
             "# TUI Second Brain AI Agent Active!",
@@ -203,6 +204,7 @@ class SecondBrainApp(App):
                 with Vertical(id="chat-area"):
                     yield Markdown(id="chat-log")
                     yield Label("", id="loading-status")  # Label pembatas loading
+                    yield OptionList(id="mention-autocomplete")
                     yield Input(
                         placeholder="Type a message to the Agent here...", id="chat-input"
                     )
@@ -246,6 +248,70 @@ class SecondBrainApp(App):
         else:
             # Sembunyikan panel Note Viewer Container
             self.query_one("#note-viewer-container").display = False
+
+    def on_input_changed(self, event: Input.Changed) -> None:
+        """Handler when user types to show mention autocomplete."""
+        value = event.value
+        if "@" in value:
+            parts = value.split(" ")
+            last_part = parts[-1]
+            if last_part.startswith("@"):
+                query = last_part[1:].lower()
+                self.show_mention_autocomplete(query)
+                return
+        self.hide_mention_autocomplete()
+
+    def show_mention_autocomplete(self, query: str) -> None:
+        """Show matching notes in the OptionList dropdown."""
+        autocomplete = self.query_one("#mention-autocomplete", OptionList)
+        autocomplete.clear_options()
+
+        from src.vault import get_all_note_paths
+        all_paths = get_all_note_paths(self.agent.vault_path)
+        
+        matches = []
+        for p in all_paths:
+            filename = os.path.basename(p)
+            if query in filename.lower():
+                matches.append(filename)
+
+        matches = matches[:5]
+        if matches:
+            for match in matches:
+                autocomplete.add_option(match)
+            autocomplete.display = True
+        else:
+            autocomplete.display = False
+
+    def hide_mention_autocomplete(self) -> None:
+        """Hide the autocomplete dropdown."""
+        autocomplete = self.query_one("#mention-autocomplete", OptionList)
+        autocomplete.display = False
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        """Handle option selection to insert the filename into the input field."""
+        selected_option = event.option.prompt
+        chat_input = self.query_one("#chat-input", Input)
+
+        value = chat_input.value
+        parts = value.split(" ")
+        
+        if " " in selected_option:
+            replacement = f'@"{selected_option}"'
+        else:
+            replacement = f"@{selected_option}"
+
+        parts[-1] = replacement
+        new_value = " ".join(parts) + " "
+        chat_input.value = new_value
+
+        self.hide_mention_autocomplete()
+        chat_input.focus()
+
+    def on_key(self, event) -> None:
+        """Allow keyboard navigation to autocomplete dropdown via down arrow."""
+        if event.key == "down" and self.query_one("#mention-autocomplete").display:
+            self.query_one("#mention-autocomplete").focus()
 
 
 if __name__ == "__main__":
