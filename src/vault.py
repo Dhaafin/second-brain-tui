@@ -172,6 +172,83 @@ def get_all_note_paths(vault_path: str) -> list[str]:
     """Retrieve all cached note paths from the vault."""
     _ensure_cache_loaded(vault_path)
     return list(_notes_cache.keys())
+
+def generate_vault_index(vault_path: str) -> str:
+    """Scan all markdown files in the vault and generate a structured index map."""
+    resolved_vault = Path(vault_path).resolve()
+    EXCLUDED_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".venv", "__pycache__"}
+    
+    folders_map = {}
+    
+    for file_path in resolved_vault.rglob("*.md"):
+        if any(part in EXCLUDED_DIRS for part in file_path.parts):
+            continue
+        if file_path.name == "Agent Memory.md":
+            continue
+            
+        try:
+            rel_path = file_path.relative_to(resolved_vault)
+            parts = rel_path.parts
+            
+            # Group by folder
+            folder_group = "/".join(parts[:-1]) if len(parts) > 1 else "/"
+            
+            # Extract first heading
+            title = file_path.stem
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    if line.startswith("# "):
+                        title = line[2:].strip()
+                        break
+                        
+            if folder_group not in folders_map:
+                folders_map[folder_group] = []
+                
+            folders_map[folder_group].append({
+                "title": title,
+                "path": str(rel_path).replace("\\", "/")
+            })
+        except OSError:
+            continue
+            
+    md_lines = ["\n## 🗺️ Vault Knowledge Map\n"]
+    for folder in sorted(folders_map.keys()):
+        md_lines.append(f"\n### 📁 {folder}")
+        for note in sorted(folders_map[folder], key=lambda x: x["path"]):
+            md_lines.append(f"- **{note['title']}** (`{note['path']}`)")
+            
+    return "\n".join(md_lines)
+
+def update_vault_index_in_memory(vault_path: str) -> None:
+    """Updates only the Vault Knowledge Map section in Agent Memory.md, keeping user edits intact."""
+    resolved_vault = Path(vault_path).resolve()
+    memory_file = resolved_vault / "Agent Memory.md"
+    if not memory_file.exists():
+        return
+        
+    try:
+        content = memory_file.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return
+        
+    new_map = generate_vault_index(vault_path)
+    map_block = f"<!-- MAP_START -->\n{new_map}\n<!-- MAP_END -->"
+    
+    if "<!-- MAP_START -->" in content:
+        parts = content.split("<!-- MAP_START -->")
+        header = parts[0]
+        footer = ""
+        if "<!-- MAP_END -->" in parts[1]:
+            subparts = parts[1].split("<!-- MAP_END -->")
+            footer = subparts[1]
+        new_content = header + map_block + footer
+    else:
+        new_content = content.rstrip() + "\n\n" + map_block
+        
+    try:
+        memory_file.write_text(new_content, encoding="utf-8")
+    except OSError:
+        pass
             
 
     

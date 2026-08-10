@@ -5,7 +5,7 @@ import re
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from src.vault import append_note, read_note, write_note, search_notes, delete_to_trash, restore_from_trash, list_vault_directory
+from src.vault import append_note, read_note, write_note, search_notes, delete_to_trash, restore_from_trash, list_vault_directory, generate_vault_index, update_vault_index_in_memory
 
 load_dotenv(".env.local")
 
@@ -162,6 +162,8 @@ class SecondBrainAgent:
         
     def load_memory(self) -> None:
         """Read persistent memory from Agent Memory.md and inject it into the chat history."""
+        # Auto-sync Knowledge Map of vault files on load
+        update_vault_index_in_memory(self.vault_path)
 
         memory_content = read_note(self.vault_path, "Agent Memory.md")
 
@@ -184,11 +186,12 @@ class SecondBrainAgent:
                 "- Language: Indonesian\n"
                 "- Default Project Directory: 01 Projects\n"
                 "- Default Capture Directory: 00 Inbox\n\n"
-                "## 📌 Active Projects\n"
-                "- TUI Second Brain: `01 Projects/01 TUI Second Brain`\n\n"
                 "## 🧠 Custom Rules\n"
                 "- Selalu gunakan tool `list_vault_directory` sebelum membuat folder atau menulis catatan baru.\n"
-                "- Prefer to reply in Indonesian unless requested otherwise.\n"
+                "- Prefer to reply in Indonesian unless requested otherwise.\n\n"
+                "<!-- MAP_START -->\n"
+                f"{generate_vault_index(self.vault_path)}\n"
+                "<!-- MAP_END -->"
             )
             write_note(self.vault_path, "Agent Memory.md", default_template)
             self.load_memory()
@@ -249,11 +252,12 @@ class SecondBrainAgent:
                 "- Language: Indonesian\n"
                 "- Default Project Directory: 01 Projects\n"
                 "- Default Capture Directory: 00 Inbox\n\n"
-                "## 📌 Active Projects\n"
-                "- TUI Second Brain: `01 Projects/01 TUI Second Brain`\n\n"
                 "## 🧠 Custom Rules\n"
                 "- Selalu gunakan tool `list_vault_directory` sebelum membuat folder atau menulis catatan baru.\n"
-                "- Prefer to reply in Indonesian unless requested otherwise.\n"
+                "- Prefer to reply in Indonesian unless requested otherwise.\n\n"
+                "<!-- MAP_START -->\n"
+                f"{generate_vault_index(self.vault_path)}\n"
+                "<!-- MAP_END -->"
             )
             write_note(self.vault_path, "Agent Memory.md", default_template)
             self.load_memory()
