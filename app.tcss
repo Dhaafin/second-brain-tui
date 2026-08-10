@@ -52,10 +52,21 @@
     background: transparent;
     color: #f8fafc;
     padding: 1 2;
+    overflow-y: auto; /* Tampilkan scrollbar saat teks meluap */
 }
 
 #note-viewer:focus {
     background: #151e2e;
+}
+
+/* Custom ScrollBar (Slider) styling */
+ScrollBar {
+    background: #334155;
+    color: #6366f1; /* Neon indigo scrollbar thumb */
+}
+
+ScrollBar:hover {
+    color: #818cf8;
 }
 
 #chat-area {
