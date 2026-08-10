@@ -2,12 +2,17 @@ import os
 from dotenv import load_dotenv
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import DirectoryTree, Footer, Header, Input, Label, Markdown
+from textual.widgets import Button, DirectoryTree, Footer, Header, Input, Label, Markdown
 
 from src.agent import SecondBrainAgent
 
 # Load environment variables
 load_dotenv(".env.local")
+
+
+class FocusableMarkdown(Markdown):
+    """Markdown widget that can accept focus for keyboard scrolling."""
+    can_focus = True
 
 
 class SecondBrainApp(App):
@@ -24,9 +29,8 @@ class SecondBrainApp(App):
     def on_mount(self) -> None:
         self.agent = SecondBrainAgent()
 
-        # Sembunyikan pembaca catatan di awal
-        note_viewer = self.query_one("#note-viewer", Markdown)
-        note_viewer.display = False
+        # Sembunyikan container pembaca catatan di awal
+        self.query_one("#note-viewer-container").display = False
 
         self.chat_history = [
             "# TUI Second Brain AI Agent Active!",
@@ -156,7 +160,8 @@ class SecondBrainApp(App):
                 content = file_path.read_text(encoding="utf-8", errors="ignore")
                 note_viewer = self.query_one("#note-viewer", Markdown)
                 note_viewer.update(content)
-                note_viewer.display = True  # Tampilkan panel pembaca catatan!
+                self.query_one("#note-viewer-title", Label).update(f"📄 {file_path.name}")
+                self.query_one("#note-viewer-container").display = True  # Tampilkan container!
             except OSError:
                 pass
 
@@ -169,11 +174,15 @@ class SecondBrainApp(App):
                 yield DirectoryTree(path=vault_path, id="file-tree")
 
             with Vertical(id="main-content"):
-                # Top Panel: Obsidian Note Viewer (Formatted Markdown)
-                yield Markdown(
-                    "# Select a Note\n\nPlease select a note from the left sidebar to read it here...",
-                    id="note-viewer"
-                )
+                # Top Panel: Obsidian Note Viewer Container with Header & Focusable Markdown
+                with Vertical(id="note-viewer-container"):
+                    with Horizontal(id="note-viewer-header"):
+                        yield Label("📄 Note Viewer", id="note-viewer-title")
+                        yield Button("X", id="close-note-btn", variant="error")
+                    yield FocusableMarkdown(
+                        "# Select a Note\n\nPlease select a note from the left sidebar to read it here...",
+                        id="note-viewer"
+                    )
                 
                 # Panel Bawah: AI Agent Chat
                 with Vertical(id="chat-area"):
@@ -184,6 +193,11 @@ class SecondBrainApp(App):
                     )
 
         yield Footer()
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        """Handler ketika tombol X diklik untuk menutup note viewer."""
+        if event.button.id == "close-note-btn":
+            self.action_close_viewer()
 
     def action_clear_chat(self) -> None:
         """Aksi ketika menekan tombol 'c' untuk membersihkan log chat."""
@@ -215,9 +229,8 @@ class SecondBrainApp(App):
             chat_log.update("\n\n".join(self.chat_history))
             self.scroll_chat_to_bottom(chat_log)
         else:
-            # Sembunyikan panel Note Viewer
-            note_viewer = self.query_one("#note-viewer", Markdown)
-            note_viewer.display = False
+            # Sembunyikan panel Note Viewer Container
+            self.query_one("#note-viewer-container").display = False
 
 
 if __name__ == "__main__":

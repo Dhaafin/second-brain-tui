@@ -15,13 +15,47 @@
     height: 100%;
 }
 
-#note-viewer {
+#note-viewer-container {
     display: none; /* Sembunyikan di awal */
     height: 3fr;   /* 60% dari ruang vertikal jika ditampilkan */
     background: #1e293b; /* Slate 800 */
-    color: #f8fafc;
     border: round #334155;
     margin: 1 2 0 2;
+    layout: vertical;
+}
+
+#note-viewer-header {
+    height: 3;
+    background: #334155; /* Slate 700 / dark header */
+    border-bottom: thin #475569;
+    padding: 0 1;
+    align: middle;
+}
+
+#note-viewer-title {
+    width: 1fr;
+    color: #fbbf24; /* Amber title text */
+    text-style: bold;
+    content-align: left middle;
+}
+
+#close-note-btn {
+    width: 5;
+    height: 1;
+    min-width: 5;
+    padding: 0;
+    margin: 0;
+}
+
+#note-viewer {
+    height: 1fr;
+    background: transparent;
+    color: #f8fafc;
+    padding: 1 2;
+}
+
+#note-viewer:focus {
+    background: #151e2e;
 }
 
 #chat-area {
