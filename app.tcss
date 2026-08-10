@@ -70,11 +70,13 @@ ScrollBar:hover {
 }
 
 #chat-area {
+    width: 100%;
     height: 2fr;   /* 40% tinggi jika ada note-viewer, 100% jika note-viewer disembunyikan */
     padding: 0 2 1 2;
 }
 
 #chat-log {
+    width: 100%;
     height: 1fr;
     background: #090d16;
     color: #f8fafc;
@@ -94,6 +96,7 @@ ScrollBar:hover {
 }
 
 #chat-input {
+    width: 100%;
     height: 3;
     background: #1e293b;
     border: tall #6366f1; /* Neon indigo */
