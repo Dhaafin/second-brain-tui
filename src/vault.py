@@ -3,6 +3,23 @@ from pathlib import Path
 _notes_cache = {}
 _cache_loaded = False
 
+def list_vault_directory(vault_path:str) -> list[str]:
+    resolved_vault = Path(vault_path).resolve()
+    EXCLUDED_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".venv", "__pycache__"}
+    dirs = []
+
+    for p in resolved_vault.rglob("*"):
+        if p.is_dir():
+            if any(part in EXCLUDED_DIRS for part in p.parts):
+                continue
+            rel_path = p.relative_to(resolved_vault)
+
+            if len(rel_path.parts) <= 2:
+                clean_path = str(rel_path).replace("\\", "/")
+                dirs.append(clean_path)
+
+    return sorted(dirs)
+
 def _ensure_cache_loaded(vault_path: str) -> None:
     global _notes_cache, _cache_loaded
 
