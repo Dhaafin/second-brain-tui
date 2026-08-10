@@ -4,9 +4,13 @@ from textual.widgets import Input, Label, Markdown, OptionList
 from textual.containers import Vertical
 from src.agent import SecondBrainAgent
 
+class FocusableMarkdown(Markdown):
+    """Markdown widget that can accept focus for keyboard scrolling."""
+    can_focus = True
+
 class ChatPanel(Vertical):
     def compose(self):
-        yield Markdown(id="chat-log")
+        yield FocusableMarkdown(id="chat-log")
         yield Label("", id="loading-status")
         yield OptionList(id="mention-autocomplete")
         yield Input(

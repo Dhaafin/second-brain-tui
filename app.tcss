@@ -82,6 +82,7 @@ ScrollBar:hover {
     color: #f8fafc;
     border: round #475569;
     padding: 1 2;
+    overflow-y: auto;
 }
 
 #loading-status {
