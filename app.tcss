@@ -27,9 +27,9 @@
 #note-viewer-header {
     height: 3;
     background: #334155; /* Slate 700 / dark header */
-    border-bottom: thin #475569;
+    border-bottom: solid #475569;
     padding: 0 1;
-    align: middle;
+    align: left middle;
 }
 
 #note-viewer-title {

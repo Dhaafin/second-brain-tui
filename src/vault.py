@@ -144,7 +144,7 @@ def restore_from_trash(vault_path:str, filename:str) -> str:
         try: 
             content = dest_path.read_text(encoding="utf-8", errors="ignore")
             _notes_cache[filename] = content
-        except OSError:
+        except OSError:fix: correct border-bottom and align properties in app.tcss
             pass
 
         return f"Success: Restored '{filename}' from trash."
