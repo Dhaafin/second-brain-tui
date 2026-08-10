@@ -1,5 +1,33 @@
 from pathlib import Path
 
+_notes_cache = {}
+_cache_loaded = False
+
+def _ensure_cache_loaded(vault_path: str) -> None:
+    global _notes_cache, _cache_loaded
+
+    if _cache_loaded:
+        return
+
+    vault = Path(vault_path)
+    EXCLUDED_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".venv"}
+
+    _notes_cache.clear()
+
+    for file_path in vault.rglob("*.md"):
+        try:
+            if any(part in EXCLUDED_DIRS for part in file_path.parts):
+                continue
+
+            rel_path = str(file_path.relative_to(vault))
+
+            content = file_path.read_text(encoding="utf-8", errors="ignore")
+
+            _notes_cache[rel_path] = content
+        except OSError:
+            continue
+    
+    _cache_loaded = True
 
 def search_notes(vault_path: str, query: str) -> list[str]:
     """Search for keywords in all .md files in the Obsidian folder."""
