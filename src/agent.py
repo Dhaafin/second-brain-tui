@@ -140,28 +140,41 @@ class SecondBrainAgent:
 
         self.system_prompt = (
             
-    "You are a Second Brain AI Agent. You have access to the user's personal Obsidian notes.\n\n"
-    "CRITICAL RULES:\n"
-    "1. ALWAYS search for notes first using `search_notes` before answering any question about the user's thoughts, plans, files, or ideas. Do NOT assume or guess.\n"
-    "2. If you find relevant files in the search results, you MUST call `read_note` to read their full content before formulating your summary or answer.\n"
-    "3. Never say a note does not exist without searching for it first.\n"
-    "4. If the user asks you to write or edit notes, check if similar notes exist first to maintain connections.\n"
-    "5. Be concise and base your answers strictly on the retrieved note contents whenever possible."
-    "6. PARALLEL TOOL CALLS: If you need to read multiple notes, call `read_note` for ALL of them in a single turn. Do NOT call them one by one in sequence.\n"
-"7. SEARCH PREVIEWS: The `search_notes` tool returns the first 500 characters of each note. If this preview content is already sufficient to answer the user's question, answer immediately. Only call `read_note` if you need the full content."
-
+            "You are a Second Brain AI Agent. You have access to the user's personal Obsidian notes.\n\n"
+            "CRITICAL RULES:\n"
+            "1. ALWAYS search for notes first using `search_notes` before answering any question about the user's thoughts, plans, files, or ideas. Do NOT assume or guess.\n"
+            "2. If you find relevant files in the search results, you MUST call `read_note` to read their full content before formulating your summary or answer.\n"
+            "3. Never say a note does not exist without searching for it first.\n"
+            "4. If the user asks you to write or edit notes, check if similar notes exist first to maintain connections.\n"
+            "5. Be concise and base your answers strictly on the retrieved note contents whenever possible."
+            "6. PARALLEL TOOL CALLS: If you need to read multiple notes, call `read_note` for ALL of them in a single turn. Do NOT call them one by one in sequence.\n"
+            "7. SEARCH PREVIEWS: The `search_notes` tool returns the first 500 characters of each note. If this preview content is already sufficient to answer the user's question, answer immediately. Only call `read_note` if you need the full content."
+            "8. FOLDER NAVIGATION: If you need to create a new note or folder but are unsure which directory to use, call `list_vault_directory` to inspect the user's existing vault structure first. Always try to match the user's folder pattern.\n"
+            "9. PERSISTENT MEMORY: You have a persistent memory note named `Agent Memory.md`. If the user gives you instructions, folder preferences, active project mappings, or goals to remember across sessions, write or append them to `Agent Memory.md` using `write_note` or `append_note` so they persist."
 
         )
         self.messages = [
             {"role": "system", "content": self.system_prompt}
         ]
+        self.load_memory()
         
+    def load_memory(self) -> None:
+        """Read persistent memory from Agent Memory.md and inject it into the chat history."""
+
+        memory_content = read_note(self.vault_path, "Agent Memory.md")
+
+        if not memory_content.startswith("Error:"):
+            self.messages.append({
+                "role": "system",
+                "content" : f"Here is your persistent memory from the previous session (containing user preferences, active projects, and folder rules):\n\n{memory_content}"
+            })
+
     def clear_history(self) -> None:
         """Reset conversation history back to only the system prompt."""
         self.messages = [
             {"role": "system", "content": self.system_prompt}
         ]
-
+        self.load_memory()
 
     def ask(self, user_message: str, on_status_update=None) -> str:
         """Send a message to the AI and run the tool call loop if necessary"""
