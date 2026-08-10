@@ -1,5 +1,6 @@
 import json
 import os
+import re
 
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -208,6 +209,26 @@ class SecondBrainAgent:
                 "di root vault Anda? (Ketik **ya** atau **tidak**)"
             )
 
+    def parse_file_mentions(self, prompt: str) -> tuple[str, str]:
+        """Detect and load file content mentioned via @filename.md or @'filename'"""
+        pattern = r'@(?:"([^"]+)"|(\S+))'
+        matches = re.findall(pattern, prompt)
+        
+        contexts = []
+        clean_prompt = prompt
+        
+        for match in matches:
+            filename = match[0] if match[0] else match[1]
+            if not filename.endswith(".md"):
+                filename += ".md"
+            
+            content = read_note(self.vault_path, filename)
+            if not content.startswith("Error:"):
+                contexts.append(f"=== CONTENT OF {filename} ===\n{content}\n")
+                clean_prompt = clean_prompt.replace(f"@{filename}", "").replace(f'@"{filename}"', "")
+                
+        return clean_prompt.strip(), "\n".join(contexts)
+
     def clear_history(self) -> None:
         """Reset conversation history back to only the system prompt."""
         self.messages = [
@@ -238,7 +259,14 @@ class SecondBrainAgent:
             self.load_memory()
             return "Berkas `Agent Memory.md` berhasil diinisialisasi secara manual di root vault Anda!"
 
-        self.messages.append({"role": "user","content": user_message})
+        # Parse file mentions in user prompt
+        clean_message, context = self.parse_file_mentions(user_message)
+        if context:
+            user_message_to_send = f"{clean_message}\n\n{context}"
+        else:
+            user_message_to_send = user_message
+
+        self.messages.append({"role": "user", "content": user_message_to_send})
 
         for _ in range(5):
             response = client.chat.completions.create(
