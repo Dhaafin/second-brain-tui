@@ -36,6 +36,17 @@ class SecondBrainApp(App):
             "# TUI Second Brain AI Agent Active!",
             "Type a message below and press Enter. Press Q to exit."
         ]
+
+        # Check if Agent Memory.md exists in the vault
+        memory_file_path = os.path.join(self.agent.vault_path, "Agent Memory.md")
+        if not os.path.exists(memory_file_path):
+            self.agent.awaiting_onboarding_consent = True
+            self.chat_history.append(
+                "### Agent\n"
+                "Hi! I noticed that you don't have an `Agent Memory.md` file in your vault. "
+                "This file helps me remember your preferences (like project directories, logging rules, etc.) "
+                "across sessions. Do you want me to initialize it for you? (Type **yes** or **no**)"
+            )
         
         # Posisi & arah untuk animasi peselancar
         self.surf_pos = 0
@@ -131,8 +142,12 @@ class SecondBrainApp(App):
             def update_status(status_text: str):
                 self.current_agent_status = status_text
 
-            # Jalankan pemanggilan API AI di background thread
-            response = await asyncio.to_thread(self.agent.ask, prompt, update_status)
+            if getattr(self.agent, "awaiting_onboarding_consent", False):
+                response = self.agent.process_onboarding(prompt)
+                await asyncio.sleep(0.5)
+            else:
+                # Jalankan pemanggilan API AI di background thread
+                response = await asyncio.to_thread(self.agent.ask, prompt, update_status)
             
             # Matikan timer & sembunyikan pembatas loading
             if hasattr(self, "loading_timer"):

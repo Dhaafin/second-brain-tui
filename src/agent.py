@@ -156,6 +156,7 @@ class SecondBrainAgent:
         self.messages = [
             {"role": "system", "content": self.system_prompt}
         ]
+        self.awaiting_onboarding_consent = False
         self.load_memory()
         
     def load_memory(self) -> None:
@@ -169,15 +170,73 @@ class SecondBrainAgent:
                 "content" : f"Here is your persistent memory from the previous session (containing user preferences, active projects, and folder rules):\n\n{memory_content}"
             })
 
+    def process_onboarding(self, user_response: str) -> str:
+        """Process the user's response to the onboarding question for Agent Memory initialization."""
+        cleaned = user_response.lower().strip()
+        if cleaned in ("yes", "ya", "y", "setuju", "agree", "boleh", "ok", "okay"):
+            self.awaiting_onboarding_consent = False
+            default_template = (
+                "# Agent Memory\n\n"
+                "File ini digunakan oleh Second Brain AI Agent untuk menyimpan preferensi, "
+                "aturan folder, dan informasi penting lintas sesi. Anda dapat mengedit file ini secara manual langsung di Obsidian.\n\n"
+                "## ⚙️ User Preferences\n"
+                "- Language: Indonesian\n"
+                "- Default Project Directory: 01 Projects\n"
+                "- Default Capture Directory: 00 Inbox\n\n"
+                "## 📌 Active Projects\n"
+                "- TUI Second Brain: `01 Projects/01 TUI Second Brain`\n\n"
+                "## 🧠 Custom Rules\n"
+                "- Selalu gunakan tool `list_vault_directory` sebelum membuat folder atau menulis catatan baru.\n"
+                "- Prefer to reply in Indonesian unless requested otherwise.\n"
+            )
+            write_note(self.vault_path, "Agent Memory.md", default_template)
+            self.load_memory()
+            return (
+                "Awesome! Saya sudah menginisialisasi berkas `Agent Memory.md` di root vault Anda. "
+                "Memori persisten Anda sekarang aktif dan telah saya muat. Ada yang bisa saya bantu hari ini?"
+            )
+        elif cleaned in ("no", "tidak", "ga", "gak", "n", "disagree", "jangan"):
+            self.awaiting_onboarding_consent = False
+            return (
+                "Baiklah. Saya akan berjalan tanpa memori persisten untuk sesi ini. "
+                "Jika Anda berubah pikiran, Anda bisa membuat berkas `Agent Memory.md` secara manual "
+                "atau mengetik `/init-memory` untuk membuatnya nanti. Ada yang bisa saya bantu?"
+            )
+        else:
+            return (
+                "Saya kurang mengerti jawaban Anda. Apakah Anda setuju jika saya membuat file `Agent Memory.md` "
+                "di root vault Anda? (Ketik **ya** atau **tidak**)"
+            )
+
     def clear_history(self) -> None:
         """Reset conversation history back to only the system prompt."""
         self.messages = [
             {"role": "system", "content": self.system_prompt}
         ]
+        self.awaiting_onboarding_consent = False
         self.load_memory()
 
     def ask(self, user_message: str, on_status_update=None) -> str:
         """Send a message to the AI and run the tool call loop if necessary"""
+        if user_message.strip().lower() == "/init-memory":
+            self.awaiting_onboarding_consent = False
+            default_template = (
+                "# Agent Memory\n\n"
+                "File ini digunakan oleh Second Brain AI Agent untuk menyimpan preferensi, "
+                "aturan folder, dan informasi penting lintas sesi. Anda dapat mengedit file ini secara manual langsung di Obsidian.\n\n"
+                "## ⚙️ User Preferences\n"
+                "- Language: Indonesian\n"
+                "- Default Project Directory: 01 Projects\n"
+                "- Default Capture Directory: 00 Inbox\n\n"
+                "## 📌 Active Projects\n"
+                "- TUI Second Brain: `01 Projects/01 TUI Second Brain`\n\n"
+                "## 🧠 Custom Rules\n"
+                "- Selalu gunakan tool `list_vault_directory` sebelum membuat folder atau menulis catatan baru.\n"
+                "- Prefer to reply in Indonesian unless requested otherwise.\n"
+            )
+            write_note(self.vault_path, "Agent Memory.md", default_template)
+            self.load_memory()
+            return "Berkas `Agent Memory.md` berhasil diinisialisasi secara manual di root vault Anda!"
 
         self.messages.append({"role": "user","content": user_message})
 
