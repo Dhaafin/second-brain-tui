@@ -1,3 +1,5 @@
+"""Chat Panel — Main chat interface with agent interaction, notifications, and autocomplete."""
+
 import asyncio
 import os
 import random
@@ -8,7 +10,7 @@ from textual.widgets import Input, Label, Markdown, OptionList
 
 
 class FocusableMarkdown(Markdown):
-    """Markdown widget that can accept focus for keyboard scrolling."""
+    """Markdown widget that can accept keyboard focus for scrolling."""
 
     can_focus = True
 
@@ -23,34 +25,60 @@ class ChatInput(Input):
     )
 
 
+WELCOME_MESSAGE = """\
+# 🧠 Second Brain TUI
+
+```
+  ╔══════════════════════════════════════╗
+  ║   Welcome to your Second Brain!     ║
+  ║   Powered by Agnes AI 🏄            ║
+  ╚══════════════════════════════════════╝
+```
+
+**Quick Tips:**
+- Type a message below and press **Enter** to chat with Agnes
+- Use `@filename.md` to reference notes in your messages
+- Press **Escape** to close the note viewer
+- Press **Ctrl+C** to cancel an AI request
+- Press **Q** to quit
+"""
+
+
 class ChatPanel(Vertical):
+    """Main chat panel handling user input, agent responses, and notifications."""
+
     def compose(self):
         yield FocusableMarkdown(id="chat-log")
         yield Label("", id="loading-status")
         yield OptionList(id="mention-autocomplete")
         yield ChatInput(
-            placeholder="Type a message to the Agent here...", id="chat-input"
+            placeholder="Type a message to Agnes...", id="chat-input"
         )
 
     def on_mount(self) -> None:
         self.query_one("#mention-autocomplete").display = False
-        self.chat_history = [
-            "# TUI Second Brain AI Agent Active!",
-            "Type a message below and press Enter. Press Q to exit.",
-        ]
+        self.chat_history: list[str] = [WELCOME_MESSAGE]
+
+        # Surf animation state
         self.surf_pos = 0
         self.surf_dir = 1
         self.surf_width = 30
         self.wave_offset = 0
         self.wave_chars = "~≈∽≈"
+        self.elapsed_time = 0.0
+        self.current_agent_status = "is thinking"
 
         chat_log = self.query_one("#chat-log", Markdown)
         chat_log.update("\n\n".join(self.chat_history))
 
     def scroll_chat_to_bottom(self, chat_log: Markdown) -> None:
+        """Scroll the chat log to the very bottom."""
         chat_log.scroll_end(animate=False)
 
-    def generate_surf_frame(self) -> str:
+    # --- Surf Loading Animation ---
+
+    def _generate_surf_frame(self) -> str:
+        """Generate one frame of the surf loading animation."""
         wave = "".join(
             self.wave_chars[(i - self.wave_offset) % len(self.wave_chars)]
             for i in range(self.surf_width)
@@ -69,19 +97,23 @@ class ChatPanel(Vertical):
 
         return f"🌊 {animated_wave} 🌊"
 
-    def animate_loading(self) -> None:
+    def _animate_loading(self) -> None:
+        """Update the loading status label with surf animation."""
         loading_status = self.query_one("#loading-status", Label)
         self.elapsed_time += 0.1
         dots = "." * (int(self.elapsed_time * 2) % 3 + 1)
         dots_fixed = dots.ljust(3, " ")
-        wave_part = self.generate_surf_frame()
-        current_status = getattr(self, "current_agent_status", "is thinking")
+        wave_part = self._generate_surf_frame()
+        status = self.current_agent_status
 
         loading_status.update(
-            f"{wave_part} | Agnes {current_status}{dots_fixed} ({self.elapsed_time:.1f}s) | [ESC to Cancel]"
+            f"{wave_part} | Agnes {status}{dots_fixed} ({self.elapsed_time:.1f}s) | [Ctrl+C to Cancel]"
         )
 
+    # --- Message Handling ---
+
     def on_input_submitted(self, event: Input.Submitted) -> None:
+        """Handle user message submission."""
         user_text = event.value.strip()
         if not user_text:
             return
@@ -90,28 +122,30 @@ class ChatPanel(Vertical):
         chat_input = self.query_one("#chat-input", Input)
         loading_status = self.query_one("#loading-status", Label)
 
+        # Append user message and update display
         chat_input.disabled = True
         self.chat_history.append(f"### You\n{user_text}")
         chat_log.update("\n\n".join(self.chat_history))
         chat_input.value = ""
-        self.scroll_chat_to_bottom(chat_log)
+        self.call_after_refresh(self.scroll_chat_to_bottom, chat_log)
 
+        # Reset and start loading animation
         self.surf_pos = 0
         self.surf_dir = 1
         self.elapsed_time = 0.0
         self.current_agent_status = "is thinking"
         loading_status.display = True
 
-        self.loading_timer = self.set_interval(0.1, self.animate_loading)
-        self.current_worker = self.run_worker(self.get_agent_response(user_text))
+        self.loading_timer = self.set_interval(0.1, self._animate_loading)
+        self.current_worker = self.run_worker(self._get_agent_response(user_text))
 
-    async def get_agent_response(self, prompt: str) -> None:
+    async def _get_agent_response(self, prompt: str) -> None:
+        """Run the agent request in a background thread and display the response."""
         chat_log = self.query_one("#chat-log", Markdown)
         chat_input = self.query_one("#chat-input", Input)
         loading_status = self.query_one("#loading-status", Label)
 
         try:
-
             def update_status(status_text: str):
                 self.current_agent_status = status_text
 
@@ -123,69 +157,89 @@ class ChatPanel(Vertical):
                     self.app.agent.ask, prompt, update_status
                 )
 
+            # Stop loading animation
             if hasattr(self, "loading_timer"):
                 self.loading_timer.stop()
             loading_status.display = False
 
+            # Re-enable input
             chat_input.disabled = False
             chat_input.focus()
 
+            # Append agent response and scroll
             self.chat_history.append(f"### Agent\n{response}")
             chat_log.update("\n\n".join(self.chat_history))
-            self.scroll_chat_to_bottom(chat_log)
-            self.app.query_one("#file-tree").reload()
-            self.trigger_notifications()
-        except asyncio.CancelledError:
-            pass
+            self.call_after_refresh(self.scroll_chat_to_bottom, chat_log)
 
-    def trigger_notifications(self) -> None:
-        """Play sound and show desktop notification according to User Preferences in Agent Memory.md."""
+            # Refresh sidebar and trigger notifications
+            self.app.query_one("#file-tree").reload()
+            self._trigger_notifications()
+
+        except asyncio.CancelledError:
+            # Ensure loading state is always cleaned up
+            if hasattr(self, "loading_timer"):
+                self.loading_timer.stop()
+            loading_status.display = False
+            chat_input.disabled = False
+            chat_input.focus()
+
+    # --- Notifications ---
+
+    def _trigger_notifications(self) -> None:
+        """Play sound and show desktop notification based on Agent Memory.md preferences."""
         try:
-            memory_file_path = os.path.join(self.app.agent.vault_path, "Agent Memory.md")
-            if not os.path.exists(memory_file_path):
+            memory_path = os.path.join(self.app.agent.vault_path, "Agent Memory.md")
+            if not os.path.exists(memory_path):
                 return
-            
-            with open(memory_file_path, "r", encoding="utf-8", errors="ignore") as f:
+
+            with open(memory_path, "r", encoding="utf-8", errors="ignore") as f:
                 content = f.read()
 
             def get_pref(key: str, default: str) -> str:
-                match = re.search(fr"-\s*{key}\s*:\s*([^\n\r]+)", content, re.IGNORECASE)
+                match = re.search(
+                    rf"-\s*{key}\s*:\s*([^\n\r]+)", content, re.IGNORECASE
+                )
                 return match.group(1).strip() if match else default
 
             sound_pref = get_pref("Notification Sound", "enabled").lower()
             desktop_pref = get_pref("Desktop Notification", "enabled").lower()
             vibe_pref = get_pref("Notification Vibe", "Sentient").lower()
 
-            # Mainkan suara notifikasi jika diaktifkan
-            if sound_pref in ("enabled", "true", "yes", "on"):
-                import winsound
-                winsound.PlaySound("SystemNotification", winsound.SND_ALIAS | winsound.SND_ASYNC)
+            enabled_values = ("enabled", "true", "yes", "on")
 
-            # Tampilkan pop-up notifikasi desktop jika diaktifkan
-            if desktop_pref in ("enabled", "true", "yes", "on"):
+            # Play Windows notification sound
+            if sound_pref in enabled_values:
+                import winsound
+
+                winsound.PlaySound(
+                    "SystemNotification", winsound.SND_ALIAS | winsound.SND_ASYNC
+                )
+
+            # Show desktop toast notification
+            if desktop_pref in enabled_values:
                 from plyer import notification
 
                 vibes = {
                     "sentient": [
                         ("🤖 Agnes has spoken", "I finished the thinking. Don't look too closely at it, though."),
                         ("🤖 Agnes has spoken", "The response is ready. Please don't panic."),
-                        ("🤖 Agnes has spoken", "Done. I'm just stalling so I don't look at spaghetti code again.")
+                        ("🤖 Agnes has spoken", "Done. I'm just stalling so I don't look at spaghetti code again."),
                     ],
                     "coder": [
                         ("☕ Agnes (Coffee Break!)", "Task complete! Go get some coffee. You look like you're vibrating."),
                         ("💻 Agnes (Build Succeeded)", "I'm as shocked as you are. Don't touch anything!"),
-                        ("💻 Agnes", "It works. Stop staring at it.")
+                        ("💻 Agnes", "It works. Stop staring at it."),
                     ],
                     "dramatic": [
                         ("🚨 Agnes (Emergency!)", "The deed is done. The repository is safe... for now."),
                         ("🚨 Agnes (Alert!)", "Initiating response deployment. If this breaks, I was never here."),
-                        ("🚨 Agnes", "The code works, but at what cost? Go to sleep.")
+                        ("🚨 Agnes", "The code works, but at what cost? Go to sleep."),
                     ],
                     "surf": [
                         ("🏄 Agnes (Surf's Up!)", "Landed a 360 flip! Answer is ready on the shore."),
                         ("🏄 Agnes (Wipeout!)", "Fell off the surfboard but saved your reply."),
-                        ("🏄 Agnes", "Catching the vector wave. Your answer is here!")
-                    ]
+                        ("🏄 Agnes", "Catching the vector wave. Your answer is here!"),
+                    ],
                 }
 
                 vibe_list = vibes.get(vibe_pref, vibes["sentient"])
@@ -195,37 +249,39 @@ class ChatPanel(Vertical):
                     title=title,
                     message=message,
                     app_name="Second Brain TUI",
-                    timeout=4
+                    timeout=4,
                 )
         except Exception:
             pass
 
+    # --- Mention Autocomplete ---
+
     def on_input_changed(self, event: Input.Changed) -> None:
+        """Show mention autocomplete when user types @."""
         value = event.value
         if "@" in value:
             parts = value.split(" ")
             last_part = parts[-1]
             if last_part.startswith("@"):
                 query = last_part[1:].lower()
-                self.show_mention_autocomplete(query)
+                self._show_mention_autocomplete(query)
                 return
-        self.hide_mention_autocomplete()
+        self._hide_mention_autocomplete()
 
-    def show_mention_autocomplete(self, query: str) -> None:
+    def _show_mention_autocomplete(self, query: str) -> None:
+        """Display matching note filenames in the autocomplete dropdown."""
         autocomplete = self.query_one("#mention-autocomplete", OptionList)
         autocomplete.clear_options()
 
         from src.vault import get_all_note_paths
 
         all_paths = get_all_note_paths(self.app.agent.vault_path)
+        matches = [
+            os.path.basename(p)
+            for p in all_paths
+            if query in os.path.basename(p).lower()
+        ][:5]
 
-        matches = []
-        for p in all_paths:
-            filename = os.path.basename(p)
-            if query in filename.lower():
-                matches.append(filename)
-
-        matches = matches[:5]
         if matches:
             for match in matches:
                 autocomplete.add_option(match)
@@ -233,11 +289,12 @@ class ChatPanel(Vertical):
         else:
             autocomplete.display = False
 
-    def hide_mention_autocomplete(self) -> None:
-        autocomplete = self.query_one("#mention-autocomplete", OptionList)
-        autocomplete.display = False
+    def _hide_mention_autocomplete(self) -> None:
+        """Hide the mention autocomplete dropdown."""
+        self.query_one("#mention-autocomplete", OptionList).display = False
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        """Insert selected mention into the chat input."""
         selected_option = event.option.prompt
         chat_input = self.query_one("#chat-input", Input)
 
@@ -250,12 +307,12 @@ class ChatPanel(Vertical):
             replacement = f"@{selected_option}"
 
         parts[-1] = replacement
-        new_value = " ".join(parts) + " "
-        chat_input.value = new_value
+        chat_input.value = " ".join(parts) + " "
 
-        self.hide_mention_autocomplete()
+        self._hide_mention_autocomplete()
         chat_input.focus()
 
     def on_key(self, event) -> None:
+        """Navigate to autocomplete dropdown with arrow key."""
         if event.key == "down" and self.query_one("#mention-autocomplete").display:
             self.query_one("#mention-autocomplete").focus()

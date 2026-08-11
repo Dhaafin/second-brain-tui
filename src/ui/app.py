@@ -1,17 +1,12 @@
+"""Second Brain TUI — Main Application Entry Point."""
+
+import asyncio
 import os
 
 from dotenv import load_dotenv
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import (
-    Button,
-    DirectoryTree,
-    Footer,
-    Header,
-    Input,
-    Label,
-    Markdown,
-)
+from textual.widgets import DirectoryTree, Footer, Header, Input, Label, Markdown
 
 from src.agent import SecondBrainAgent
 from src.ui.components.chat_panel import ChatPanel
@@ -22,86 +17,22 @@ load_dotenv(".env.local")
 
 
 class SecondBrainApp(App):
-    """Aplikasi TUI Utama dengan Layout & Interaksi Dasar."""
+    """Main TUI Application with Catppuccin Mocha theme."""
 
+    TITLE = "🧠 Second Brain TUI"
+    SUB_TITLE = "v0.1 — Catppuccin Mocha"
     CSS_PATH = "../../app.tcss"
 
     BINDINGS = (
         ("q", "quit", "Quit"),
         ("c", "clear_chat", "Clear Chat"),
-        ("escape", "close_viewer", "Close Note / Cancel Agent"),
+        ("escape", "close_viewer", "Close Note"),
+        ("ctrl+c", "cancel_agent", "Cancel Agent"),
     )
 
     def __init__(self) -> None:
         super().__init__()
         self.agent = SecondBrainAgent()
-
-    def on_mount(self) -> None:
-        # Sembunyikan container pembaca catatan di awal
-        self.query_one("#note-viewer-container").display = False
-
-        # Check if Agent Memory.md exists in the vault
-        memory_file_path = os.path.join(self.agent.vault_path, "Agent Memory.md")
-        if not os.path.exists(memory_file_path):
-            self.agent.awaiting_onboarding_consent = True
-            chat_panel = self.query_one(ChatPanel)
-            chat_panel.chat_history.append(
-                "### Agent\n"
-                "Hi! I noticed that you don't have an `Agent Memory.md` file in your vault. "
-                "This file helps me remember your preferences (like project directories, logging rules, etc.) "
-                "across sessions. Do you want me to initialize it for you? (Type **yes** or **no**)"
-            )
-            chat_log = chat_panel.query_one("#chat-log", Markdown)
-            chat_log.update("\n\n".join(chat_panel.chat_history))
-
-        # Picu sinkronisasi RAG di latar belakang secara asinkronus
-        self.run_worker(self.sync_rag_in_background())
-
-    async def sync_rag_in_background(self) -> None:
-        """Sinkronisasi berkas vault lokal dengan Qdrant secara asinkronus di latar belakang."""
-        from src.rag import sync_vault_embeddings
-        import asyncio
-
-        chat_panel = self.query_one(ChatPanel)
-        chat_panel.chat_history.append("### Agent\n*🔄 Menyinkronkan catatan Anda (RAG) di latar belakang...*")
-        chat_log = chat_panel.query_one("#chat-log", Markdown)
-        chat_log.update("\n\n".join(chat_panel.chat_history))
-        chat_panel.scroll_chat_to_bottom(chat_log)
-
-        try:
-            # Jalankan pemindaian inkremental di thread terpisah agar UI tidak membeku
-            await asyncio.to_thread(sync_vault_embeddings, self.agent.vault_path)
-            chat_panel.chat_history.append("### Agent\n*🟢 Sinkronisasi RAG selesai! Saya sudah mengingat seluruh peta catatan Anda.*")
-        except Exception as e:
-            chat_panel.chat_history.append(f"### Agent\n*⚠️ Gagal menyinkronkan RAG: {e}*")
-
-        chat_log.update("\n\n".join(chat_panel.chat_history))
-        chat_panel.scroll_chat_to_bottom(chat_log)
-
-    def on_directory_tree_file_selected(
-        self, event: DirectoryTree.FileSelected
-    ) -> None:
-        """Handler ketika file di-klik di sidebar explorer."""
-        file_path = event.path
-        if file_path.suffix.lower() in (
-            ".md",
-            ".txt",
-            ".json",
-            ".py",
-            ".tcss",
-            ".env",
-            ".local",
-        ):
-            try:
-                content = file_path.read_text(encoding="utf-8", errors="ignore")
-                note_viewer = self.query_one("#note-viewer", Markdown)
-                note_viewer.update(content)
-                self.query_one("#note-viewer-title", Label).update(
-                    f"📄 {file_path.name}"
-                )
-                self.query_one("#note-viewer-container").display = True
-            except OSError:
-                pass
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -115,46 +46,110 @@ class SecondBrainApp(App):
 
         yield Footer()
 
-    def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handler ketika tombol X diklik untuk menutup note viewer."""
+    def on_mount(self) -> None:
+        self.query_one("#note-viewer-container").display = False
+
+        memory_file_path = os.path.join(self.agent.vault_path, "Agent Memory.md")
+        if not os.path.exists(memory_file_path):
+            self.agent.awaiting_onboarding_consent = True
+            chat_panel = self.query_one(ChatPanel)
+            chat_panel.chat_history.append(
+                "### Agent\n"
+                "Hi! I noticed you don't have an `Agent Memory.md` file in your vault. "
+                "This file helps me remember your preferences across sessions. "
+                "Do you want me to initialize it for you? (Type **yes** or **no**)"
+            )
+            chat_log = chat_panel.query_one("#chat-log", Markdown)
+            chat_log.update("\n\n".join(chat_panel.chat_history))
+
+        # Trigger background RAG sync
+        self.run_worker(self._sync_rag_background())
+
+    async def _sync_rag_background(self) -> None:
+        """Incrementally sync vault files with Qdrant vector DB in the background."""
+        from src.rag import sync_vault_embeddings
+
+        chat_panel = self.query_one(ChatPanel)
+        chat_log = chat_panel.query_one("#chat-log", Markdown)
+
+        chat_panel.chat_history.append(
+            "### Agent\n*🔄 Syncing your notes (RAG) in the background...*"
+        )
+        chat_log.update("\n\n".join(chat_panel.chat_history))
+        self.call_after_refresh(chat_panel.scroll_chat_to_bottom, chat_log)
+
+        try:
+            await asyncio.to_thread(sync_vault_embeddings, self.agent.vault_path)
+            chat_panel.chat_history.append(
+                "### Agent\n*🟢 RAG sync complete! I now remember all your notes.*"
+            )
+        except Exception as e:
+            chat_panel.chat_history.append(
+                f"### Agent\n*⚠️ RAG sync failed: {e}*"
+            )
+
+        chat_log.update("\n\n".join(chat_panel.chat_history))
+        self.call_after_refresh(chat_panel.scroll_chat_to_bottom, chat_log)
+
+    # --- Event Handlers ---
+
+    def on_directory_tree_file_selected(
+        self, event: DirectoryTree.FileSelected
+    ) -> None:
+        """Open a file from the sidebar in the note viewer panel."""
+        file_path = event.path
+        if file_path.suffix.lower() in (".md", ".txt", ".json", ".py", ".tcss", ".env", ".local"):
+            try:
+                content = file_path.read_text(encoding="utf-8", errors="ignore")
+                self.query_one("#note-viewer", Markdown).update(content)
+                self.query_one("#note-viewer-title", Label).update(f"📄 {file_path.name}")
+                self.query_one("#note-viewer-container").display = True
+            except OSError:
+                pass
+
+    def on_button_pressed(self, event) -> None:
+        """Handle close button click on note viewer."""
         if event.button.id == "close-note-btn":
             self.action_close_viewer()
 
+    # --- Actions ---
+
+    def action_close_viewer(self) -> None:
+        """Close the note viewer panel (Escape key)."""
+        self.query_one("#note-viewer-container").display = False
+
+    def action_cancel_agent(self) -> None:
+        """Cancel a running AI request (Ctrl+C)."""
+        chat_panel = self.query_one(ChatPanel)
+
+        if not (hasattr(chat_panel, "current_worker") and chat_panel.current_worker.is_running):
+            return
+
+        chat_panel.current_worker.cancel()
+
+        if hasattr(chat_panel, "loading_timer"):
+            chat_panel.loading_timer.stop()
+
+        loading_status = chat_panel.query_one("#loading-status", Label)
+        loading_status.display = False
+
+        chat_input = chat_panel.query_one("#chat-input", Input)
+        chat_input.disabled = False
+        chat_input.focus()
+
+        chat_panel.chat_history.append(
+            "### Agent\n*(Request cancelled by user 🛑)*"
+        )
+        chat_log = chat_panel.query_one("#chat-log", Markdown)
+        chat_log.update("\n\n".join(chat_panel.chat_history))
+        self.call_after_refresh(chat_panel.scroll_chat_to_bottom, chat_log)
+
     def action_clear_chat(self) -> None:
-        """Aksi ketika menekan tombol 'c' untuk membersihkan log chat."""
+        """Clear chat history and reset agent conversation."""
         chat_panel = self.query_one(ChatPanel)
         chat_panel.chat_history = []
         self.agent.clear_history()
         chat_panel.query_one("#chat-log", Markdown).update("")
-
-    def action_close_viewer(self) -> None:
-        """Sembunyikan panel pembaca catatan ATAU batalkan pencarian Agent jika sedang berjalan."""
-        chat_panel = self.query_one(ChatPanel)
-        if (
-            hasattr(chat_panel, "current_worker")
-            and chat_panel.current_worker.is_running
-        ):
-            chat_panel.current_worker.cancel()
-
-            if hasattr(chat_panel, "loading_timer"):
-                chat_panel.loading_timer.stop()
-
-            loading_status = chat_panel.query_one("#loading-status", Label)
-            loading_status.display = False
-
-            chat_input = chat_panel.query_one("#chat-input", Input)
-            chat_input.disabled = False
-            chat_input.focus()
-
-            chat_panel.chat_history.append(
-                "### Agent\n*(X) Search cancelled by user (Agnes fell off her surfboard 🏄💥...)*"
-            )
-
-            chat_log = chat_panel.query_one("#chat-log", Markdown)
-            chat_log.update("\n\n".join(chat_panel.chat_history))
-            chat_panel.scroll_chat_to_bottom(chat_log)
-        else:
-            self.query_one("#note-viewer-container").display = False
 
 
 if __name__ == "__main__":
