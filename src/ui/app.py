@@ -6,13 +6,13 @@ import os
 from dotenv import load_dotenv
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import DirectoryTree, Footer, Header, Input, Label, Markdown
+from textual.widgets import DirectoryTree, Footer, Header, Label, Markdown
 
 from src.agent import SecondBrainAgent
 from src.ui.components.chat_panel import ChatPanel
 from src.ui.components.note_viewer import NoteViewerPanel
-from src.ui.components.sidebar import SidebarPanel
 from src.ui.components.settings_modal import SettingsModal
+from src.ui.components.sidebar import SidebarPanel
 
 load_dotenv(".env.local")
 

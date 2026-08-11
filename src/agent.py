@@ -5,7 +5,12 @@ import re
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from src.rag import delete_directory_index, delete_file_index, index_file, query_semantic_notes
+from src.rag import (
+    delete_directory_index,
+    delete_file_index,
+    index_file,
+    query_semantic_notes,
+)
 from src.vault import (
     append_note,
     delete_directory_to_trash,
@@ -14,7 +19,6 @@ from src.vault import (
     list_vault_directory,
     read_note,
     restore_from_trash,
-    search_notes,
     update_vault_index_in_memory,
     write_note,
 )
@@ -167,7 +171,7 @@ class SecondBrainAgent:
     def __init__(self):
         self.vault_path = os.getenv("OBSIDIAN_PATH")
         self.model = os.getenv("AI_MODEL")
-        self.max_steps = int(os.getenv("AI_MAX_STEPS", 10))
+        self.max_steps = int(os.getenv("AI_MAX_STEPS", "10"))
 
         self.system_prompt = (
             "You are a Second Brain AI Agent. You have access to the user's personal Obsidian notes.\n\n"

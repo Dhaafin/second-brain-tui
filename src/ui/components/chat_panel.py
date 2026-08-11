@@ -1,14 +1,14 @@
 """Chat Panel — Main chat interface with agent interaction, notifications, and autocomplete."""
 
-from textual.message import Message
-from textual.containers import Horizontal, Vertical, VerticalScroll
-from textual.widgets import Label, Markdown, OptionList, TextArea
-
-
 import asyncio
+import logging
 import os
 import random
 import re
+
+from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.message import Message
+from textual.widgets import Label, Markdown, OptionList, TextArea
 
 class FocusableMarkdown(Markdown):
     """Markdown widget that can accept keyboard focus for scrolling."""
@@ -54,20 +54,20 @@ class ChatInput(TextArea):
             os.close(temp_fd)
 
             with self.app.suspend():
-                subprocess.run(["notepad.exe", temp_path])
+                subprocess.run(["notepad.exe", temp_path], check=False)
 
             with open(temp_path, "r", encoding="utf-8", errors="ignore") as f:
                 new_text = f.read()
 
             self.text = new_text
             self.move_cursor((len(new_text.split("\n")) - 1, len(new_text.split("\n")[-1])))
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger("second_brain").warning("Failed to open external editor: %s", e)
         finally:
             try:
                 os.remove(temp_path)
-            except OSError:
-                pass
+            except OSError as e:
+                logging.getLogger("second_brain").debug("Failed to remove temp file: %s", e)
 
 
 WELCOME_MESSAGE = """\
@@ -167,8 +167,8 @@ class ChatPanel(Vertical):
             from src.vault import get_all_note_paths
             notes_count = len(get_all_note_paths(self.app.agent.vault_path))
             self.query_one("#dashboard-rag", Label).update(f"🟢 RAG: {notes_count} Notes")
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger("second_brain").debug("Failed to update RAG status: %s", e)
 
     # --- Surf Loading Animation ---
 
@@ -350,8 +350,8 @@ class ChatPanel(Vertical):
                     app_name="Second Brain TUI",
                     timeout=4,
                 )
-        except Exception:
-            pass
+        except Exception as e:
+            logging.getLogger("second_brain").debug("Notification trigger failed: %s", e)
 
     # --- Mention Autocomplete ---
 
