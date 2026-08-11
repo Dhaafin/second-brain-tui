@@ -21,7 +21,7 @@ def list_vault_directory(vault_path:str) -> list[str]:
     return sorted(dirs)
 
 def _ensure_cache_loaded(vault_path: str) -> None:
-    global _notes_cache, _cache_loaded
+    global _cache_loaded
 
     if _cache_loaded:
         return
@@ -141,7 +141,7 @@ def delete_to_trash(vault_path:str, filename:str) -> str:
         _notes_cache.pop(filename, None)
 
         return f"Success: Moved '{filename}' to trash"
-    except OSError as e:
+    except OSError:
         return f"Error: failed to move '{filename}' to trash due to access issues"
 
 def restore_from_trash(vault_path:str, filename:str) -> str:
@@ -165,7 +165,7 @@ def restore_from_trash(vault_path:str, filename:str) -> str:
             pass
 
         return f"Success: Restored '{filename}' from trash."
-    except OSError as e:
+    except OSError:
         return f"Error: Failed to restore '{filename}' due to access issues."
 
 def get_all_note_paths(vault_path: str) -> list[str]:

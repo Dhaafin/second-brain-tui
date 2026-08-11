@@ -4,8 +4,6 @@ import os
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
 
-from src.agent import SecondBrainAgent
-
 
 class FocusableMarkdown(Markdown):
     """Markdown widget that can accept focus for keyboard scrolling."""
@@ -16,11 +14,11 @@ class FocusableMarkdown(Markdown):
 class ChatInput(Input):
     """Custom Input with standard selection and cursor bindings."""
 
-    BINDINGS = [
+    BINDINGS = (
         ("ctrl+a", "select_all", "Select All"),
         ("ctrl+home", "home(True)", "Select to Start"),
         ("ctrl+end", "end(True)", "Select to End"),
-    ]
+    )
 
 
 class ChatPanel(Vertical):
