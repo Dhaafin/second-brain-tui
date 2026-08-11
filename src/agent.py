@@ -5,7 +5,17 @@ import re
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from src.vault import append_note, read_note, write_note, search_notes, delete_to_trash, restore_from_trash, list_vault_directory, generate_vault_index, update_vault_index_in_memory
+from src.vault import (
+    append_note,
+    delete_to_trash,
+    generate_vault_index,
+    list_vault_directory,
+    read_note,
+    restore_from_trash,
+    search_notes,
+    update_vault_index_in_memory,
+    write_note,
+)
 
 load_dotenv(".env.local")
 
@@ -54,16 +64,16 @@ AI_TOOLS = [
                 "properties": {
                     "filename": {
                         "type": "string",
-                        "description": "The target relative path and filename, e.g., 'Notes/Draft.md'."
+                        "description": "The target relative path and filename, e.g., 'Notes/Draft.md'.",
                     },
                     "content": {
                         "type": "string",
-                        "description": "The markdown content of the note."
-                    }
+                        "description": "The markdown content of the note.",
+                    },
                 },
-                "required": ["filename", "content"]
-            }
-        }
+                "required": ["filename", "content"],
+            },
+        },
     },
     {
         "type": "function",
@@ -75,16 +85,16 @@ AI_TOOLS = [
                 "properties": {
                     "filename": {
                         "type": "string",
-                        "description": "The target filename, e.g., 'DailyLog.md'."
+                        "description": "The target filename, e.g., 'DailyLog.md'.",
                     },
                     "content": {
                         "type": "string",
-                        "description": "The text content to append."
-                    }
+                        "description": "The text content to append.",
+                    },
                 },
-                "required": ["filename", "content"]
-            }
-        }
+                "required": ["filename", "content"],
+            },
+        },
     },
     {
         "type": "function",
@@ -141,7 +151,6 @@ class SecondBrainAgent:
         self.max_steps = int(os.getenv("AI_MAX_STEPS", 10))
 
         self.system_prompt = (
-            
             "You are a Second Brain AI Agent. You have access to the user's personal Obsidian notes.\n\n"
             "CRITICAL RULES:\n"
             "1. ALWAYS search for notes first using `search_notes` before answering any question about the user's thoughts, plans, files, or ideas. Do NOT assume or guess.\n"
@@ -153,14 +162,11 @@ class SecondBrainAgent:
             "7. SEARCH PREVIEWS: The `search_notes` tool returns the first 500 characters of each note. If this preview content is already sufficient to answer the user's question, answer immediately. Only call `read_note` if you need the full content."
             "8. FOLDER NAVIGATION: If you need to create a new note or folder but are unsure which directory to use, call `list_vault_directory` to inspect the user's existing vault structure first. Always try to match the user's folder pattern.\n"
             "9. PERSISTENT MEMORY: You have a persistent memory note named `Agent Memory.md`. If the user gives you instructions, folder preferences, active project mappings, or goals to remember across sessions, write or append them to `Agent Memory.md` using `write_note` or `append_note` so they persist."
-
         )
-        self.messages = [
-            {"role": "system", "content": self.system_prompt}
-        ]
+        self.messages = [{"role": "system", "content": self.system_prompt}]
         self.awaiting_onboarding_consent = False
         self.load_memory()
-        
+
     def load_memory(self) -> None:
         """Read persistent memory from Agent Memory.md and inject it into the chat history."""
         # Auto-sync Knowledge Map of vault files on load
@@ -169,10 +175,12 @@ class SecondBrainAgent:
         memory_content = read_note(self.vault_path, "Agent Memory.md")
 
         if not memory_content.startswith("Error:"):
-            self.messages.append({
-                "role": "system",
-                "content" : f"Here is your persistent memory from the previous session (containing user preferences, active projects, and folder rules):\n\n{memory_content}"
-            })
+            self.messages.append(
+                {
+                    "role": "system",
+                    "content": f"Here is your persistent memory from the previous session (containing user preferences, active projects, and folder rules):\n\n{memory_content}",
+                }
+            )
 
     def process_onboarding(self, user_response: str) -> str:
         """Process the user's response to the onboarding question for Agent Memory initialization."""
@@ -217,27 +225,27 @@ class SecondBrainAgent:
         """Detect and load file content mentioned via @filename.md or @'filename'"""
         pattern = r'@(?:"([^"]+)"|(\S+))'
         matches = re.findall(pattern, prompt)
-        
+
         contexts = []
         clean_prompt = prompt
-        
+
         for match in matches:
             filename = match[0] if match[0] else match[1]
             if not filename.endswith(".md"):
                 filename += ".md"
-            
+
             content = read_note(self.vault_path, filename)
             if not content.startswith("Error:"):
                 contexts.append(f"=== CONTENT OF {filename} ===\n{content}\n")
-                clean_prompt = clean_prompt.replace(f"@{filename}", "").replace(f'@"{filename}"', "")
-                
+                clean_prompt = clean_prompt.replace(f"@{filename}", "").replace(
+                    f'@"{filename}"', ""
+                )
+
         return clean_prompt.strip(), "\n".join(contexts)
 
     def clear_history(self) -> None:
         """Reset conversation history back to only the system prompt."""
-        self.messages = [
-            {"role": "system", "content": self.system_prompt}
-        ]
+        self.messages = [{"role": "system", "content": self.system_prompt}]
         self.awaiting_onboarding_consent = False
         self.load_memory()
 
@@ -275,16 +283,17 @@ class SecondBrainAgent:
 
         for _ in range(self.max_steps):
             response = client.chat.completions.create(
-                model=self.model, messages=self.messages, tools=AI_TOOLS, tool_choice="auto"
+                model=self.model,
+                messages=self.messages,
+                tools=AI_TOOLS,
+                tool_choice="auto",
             )
 
             response_message = response.choices[0].message
 
             # Convert response message to a clean dictionary to remove non-standard/extra fields (like reasoning_content)
             # that cause API gateways to reject the request body with a 400 Bad Request error.
-            clean_message = {
-                "role": "assistant"
-            }
+            clean_message = {"role": "assistant"}
             if response_message.content is not None:
                 clean_message["content"] = response_message.content
             if response_message.tool_calls:
@@ -295,7 +304,7 @@ class SecondBrainAgent:
                         "function": {
                             "name": tc.function.name,
                             "arguments": tc.function.arguments,
-                        }
+                        },
                     }
                     for tc in response_message.tool_calls
                 ]
@@ -327,13 +336,13 @@ class SecondBrainAgent:
                     )
 
                 elif function_name == "delete_to_trash":
-                    filename =function_args.get("filename")
+                    filename = function_args.get("filename")
                     if on_status_update:
                         on_status_update(f"deleting '{filename}' to trash")
                     tool_output = delete_to_trash(self.vault_path, filename)
 
                 elif function_name == "restore_from_trash":
-                    filename =function_args.get("filename")
+                    filename = function_args.get("filename")
                     if on_status_update:
                         on_status_update(f"restoring '{filename}' from trash")
                     tool_output = restore_from_trash(self.vault_path, filename)
@@ -346,14 +355,14 @@ class SecondBrainAgent:
 
                 elif function_name == "write_note":
                     filename = function_args.get("filename")
-                    content = function_args.get ("content")
+                    content = function_args.get("content")
                     if on_status_update:
                         on_status_update(f"writing note '{filename}'")
                     tool_output = write_note(self.vault_path, filename, content)
 
                 elif function_name == "append_note":
                     filename = function_args.get("filename")
-                    content = function_args.get ("content")
+                    content = function_args.get("content")
                     if on_status_update:
                         on_status_update(f"appending to '{filename}'")
                     tool_output = append_note(self.vault_path, filename, content)

@@ -1,20 +1,27 @@
-import os
 import asyncio
-from textual.widgets import Input, Label, Markdown, OptionList
+import os
+
 from textual.containers import Vertical
+from textual.widgets import Input, Label, Markdown, OptionList
+
 from src.agent import SecondBrainAgent
+
 
 class FocusableMarkdown(Markdown):
     """Markdown widget that can accept focus for keyboard scrolling."""
+
     can_focus = True
+
 
 class ChatInput(Input):
     """Custom Input with standard selection and cursor bindings."""
+
     BINDINGS = [
         ("ctrl+a", "select_all", "Select All"),
         ("ctrl+home", "home(True)", "Select to Start"),
         ("ctrl+end", "end(True)", "Select to End"),
     ]
+
 
 class ChatPanel(Vertical):
     def compose(self):
@@ -29,14 +36,14 @@ class ChatPanel(Vertical):
         self.query_one("#mention-autocomplete").display = False
         self.chat_history = [
             "# TUI Second Brain AI Agent Active!",
-            "Type a message below and press Enter. Press Q to exit."
+            "Type a message below and press Enter. Press Q to exit.",
         ]
         self.surf_pos = 0
         self.surf_dir = 1
         self.surf_width = 30
         self.wave_offset = 0
         self.wave_chars = "~≈∽≈"
-        
+
         chat_log = self.query_one("#chat-log", Markdown)
         chat_log.update("\n\n".join(self.chat_history))
 
@@ -44,11 +51,14 @@ class ChatPanel(Vertical):
         chat_log.scroll_end(animate=False)
 
     def generate_surf_frame(self) -> str:
-        wave = "".join(self.wave_chars[(i - self.wave_offset) % len(self.wave_chars)] for i in range(self.surf_width))
+        wave = "".join(
+            self.wave_chars[(i - self.wave_offset) % len(self.wave_chars)]
+            for i in range(self.surf_width)
+        )
         self.wave_offset = (self.wave_offset + 1) % len(self.wave_chars)
         pos = self.surf_pos
-        animated_wave = wave[:pos] + "🏄" + wave[pos+1:]
-        
+        animated_wave = wave[:pos] + "🏄" + wave[pos + 1 :]
+
         self.surf_pos += self.surf_dir
         if self.surf_pos >= self.surf_width - 1:
             self.surf_pos = self.surf_width - 1
@@ -56,7 +66,7 @@ class ChatPanel(Vertical):
         elif self.surf_pos <= 0:
             self.surf_pos = 0
             self.surf_dir = 1
-            
+
         return f"🌊 {animated_wave} 🌊"
 
     def animate_loading(self) -> None:
@@ -66,7 +76,7 @@ class ChatPanel(Vertical):
         dots_fixed = dots.ljust(3, " ")
         wave_part = self.generate_surf_frame()
         current_status = getattr(self, "current_agent_status", "is thinking")
-        
+
         loading_status.update(
             f"{wave_part} | Agnes {current_status}{dots_fixed} ({self.elapsed_time:.1f}s) | [ESC to Cancel]"
         )
@@ -101,6 +111,7 @@ class ChatPanel(Vertical):
         loading_status = self.query_one("#loading-status", Label)
 
         try:
+
             def update_status(status_text: str):
                 self.current_agent_status = status_text
 
@@ -108,8 +119,10 @@ class ChatPanel(Vertical):
                 response = self.app.agent.process_onboarding(prompt)
                 await asyncio.sleep(0.5)
             else:
-                response = await asyncio.to_thread(self.app.agent.ask, prompt, update_status)
-            
+                response = await asyncio.to_thread(
+                    self.app.agent.ask, prompt, update_status
+                )
+
             if hasattr(self, "loading_timer"):
                 self.loading_timer.stop()
             loading_status.display = False
@@ -140,8 +153,9 @@ class ChatPanel(Vertical):
         autocomplete.clear_options()
 
         from src.vault import get_all_note_paths
+
         all_paths = get_all_note_paths(self.app.agent.vault_path)
-        
+
         matches = []
         for p in all_paths:
             filename = os.path.basename(p)
@@ -166,7 +180,7 @@ class ChatPanel(Vertical):
 
         value = chat_input.value
         parts = value.split(" ")
-        
+
         if " " in selected_option:
             replacement = f'@"{selected_option}"'
         else:
