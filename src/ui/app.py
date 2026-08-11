@@ -12,6 +12,7 @@ from src.agent import SecondBrainAgent
 from src.ui.components.chat_panel import ChatPanel
 from src.ui.components.note_viewer import NoteViewerPanel
 from src.ui.components.sidebar import SidebarPanel
+from src.ui.components.settings_modal import SettingsModal
 
 load_dotenv(".env.local")
 
@@ -108,11 +109,23 @@ class SecondBrainApp(App):
                 pass
 
     def on_button_pressed(self, event) -> None:
-        """Handle close button click on note viewer."""
+        """Handle button clicks."""
         if event.button.id == "close-note-btn":
             self.action_close_viewer()
+        elif event.button.id == "sidebar-settings-btn":
+            self.action_open_settings()
 
     # --- Actions ---
+
+    def action_open_settings(self) -> None:
+        """Open the settings modal screen."""
+        self.push_screen(SettingsModal(), callback=self.on_settings_closed)
+
+    def on_settings_closed(self, preferences_updated: bool) -> None:
+        """Callback triggered when the settings modal is closed."""
+        if preferences_updated:
+            self.agent.load_memory()
+            self.notify("Settings saved successfully!", severity="information")
 
     def action_close_viewer(self) -> None:
         """Close the note viewer panel (Escape key)."""

@@ -194,3 +194,57 @@ FooterKey {
     background: #313244;
     color: #cba6f7;
 }
+
+/* === Settings Modal === */
+SettingsModal {
+    align: center middle;
+    background: rgba(0, 0, 0, 0.6);
+}
+
+#settings-container {
+    width: 55;
+    height: auto;
+    background: #1e1e2e;
+    border: thick #cba6f7;
+    border-title-color: #cba6f7;
+    border-title-style: bold;
+    padding: 1 2;
+    layout: vertical;
+}
+
+.settings-row {
+    height: 3;
+    align: left middle;
+    layout: horizontal;
+}
+
+.settings-label {
+    width: 1fr;
+    color: #cdd6f4;
+    content-align: left middle;
+}
+
+#settings-buttons {
+    margin-top: 1;
+    height: 3;
+    align: right middle;
+    layout: horizontal;
+}
+
+#settings-buttons Button {
+    margin-left: 1;
+}
+
+#sidebar-settings-btn {
+    width: 100%;
+    height: 3;
+    margin: 1 0 0 0;
+    background: #313244;
+    color: #cba6f7;
+    border: tall #45475a;
+}
+
+#sidebar-settings-btn:hover {
+    background: #cba6f7;
+    color: #1e1e2e;
+}
