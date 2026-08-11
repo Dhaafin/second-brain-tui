@@ -5,6 +5,7 @@ import re
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from src.rag import delete_file_index, index_file, query_semantic_notes
 from src.vault import (
     append_note,
     delete_to_trash,
@@ -328,24 +329,33 @@ class SecondBrainAgent:
                     query = function_args.get("query")
                     if on_status_update:
                         on_status_update(f"searching notes for '{query}'")
-                    search_results = search_notes(self.vault_path, query)
-                    tool_output = (
-                        "\n".join(search_results)
-                        if search_results
-                        else "No Notes Found"
-                    )
+                    semantic_hits = query_semantic_notes(query, limit=5)
+                    results = []
+                    for hit in semantic_hits:
+                        filename = hit.payload.get("filename", "unknown")
+                        text = hit.payload.get("text", "")
+                        score = hit.score
+                        results.append(
+                            f"=== File: '{filename}' (Similarity: {score:.4f}) ===\n"
+                            f"Content Snippet:\n{text}\n"
+                        )
+                    tool_output = "\n".join(results) if results else "No semantic matches found."
 
                 elif function_name == "delete_to_trash":
                     filename = function_args.get("filename")
                     if on_status_update:
                         on_status_update(f"deleting '{filename}' to trash")
                     tool_output = delete_to_trash(self.vault_path, filename)
+                    if not tool_output.startswith("Error"):
+                        delete_file_index(filename)
 
                 elif function_name == "restore_from_trash":
                     filename = function_args.get("filename")
                     if on_status_update:
                         on_status_update(f"restoring '{filename}' from trash")
                     tool_output = restore_from_trash(self.vault_path, filename)
+                    if not tool_output.startswith("Error"):
+                        index_file(self.vault_path, filename)
 
                 elif function_name == "read_note":
                     filename = function_args.get("filename")
@@ -359,6 +369,8 @@ class SecondBrainAgent:
                     if on_status_update:
                         on_status_update(f"writing note '{filename}'")
                     tool_output = write_note(self.vault_path, filename, content)
+                    if not tool_output.startswith("Error"):
+                        index_file(self.vault_path, filename)
 
                 elif function_name == "append_note":
                     filename = function_args.get("filename")
@@ -366,6 +378,8 @@ class SecondBrainAgent:
                     if on_status_update:
                         on_status_update(f"appending to '{filename}'")
                     tool_output = append_note(self.vault_path, filename, content)
+                    if not tool_output.startswith("Error"):
+                        index_file(self.vault_path, filename)
 
                 else:
                     tool_output = f"Error: Tool '{function_name}' not found."
