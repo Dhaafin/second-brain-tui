@@ -1,4 +1,5 @@
 import json
+import logging
 import os
 import re
 
@@ -309,9 +310,13 @@ class SecondBrainAgent:
             user_message_to_send = user_message
 
         self.messages.append({"role": "user", "content": user_message_to_send})
+        logging.getLogger("second_brain").info("User query: %s", user_message_to_send)
 
         for step in range(self.max_steps):
             steps_remaining = self.max_steps - step
+            logging.getLogger("second_brain").info(
+                "Step %d of %d starting. Requesting LLM completion.", step + 1, self.max_steps
+            )
             step_notice = (
                 f"[SYSTEM NOTICE: You are at step {step + 1} of {self.max_steps}. "
                 f"You have {steps_remaining} steps remaining in this turn to complete all your tasks. "
@@ -328,6 +333,11 @@ class SecondBrainAgent:
             )
 
             response_message = response.choices[0].message
+            logging.getLogger("second_brain").info(
+                "LLM response: content='%s', tool_calls=%s",
+                response_message.content,
+                [tc.function.name for tc in response_message.tool_calls] if response_message.tool_calls else None
+            )
 
             # Convert response message to a clean dictionary to remove non-standard/extra fields (like reasoning_content)
             # that cause API gateways to reject the request body with a 400 Bad Request error.
@@ -353,8 +363,10 @@ class SecondBrainAgent:
 
             for tool_call in response_message.tool_calls:
                 function_name = tool_call.function.name
-
                 function_args = json.loads(tool_call.function.arguments)
+                logging.getLogger("second_brain").info(
+                    "Executing tool: name='%s', args=%s", function_name, function_args
+                )
 
                 if function_name == "list_vault_directory":
                     if on_status_update:
@@ -428,6 +440,9 @@ class SecondBrainAgent:
 
                 else:
                     tool_output = f"Error: Tool '{function_name}' not found."
+                logging.getLogger("second_brain").info(
+                    "Tool '%s' returned: %s", function_name, tool_output
+                )
                 self.messages.append(
                     {
                         "tool_call_id": tool_call.id,
@@ -437,4 +452,5 @@ class SecondBrainAgent:
                     }
                 )
 
+        logging.getLogger("second_brain").error("Agent reasoning budget exhausted.")
         return "Error: Agent reached maximum reasoning steps without answering."

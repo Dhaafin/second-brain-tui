@@ -1,6 +1,7 @@
 """Second Brain TUI — Main Application Entry Point."""
 
 import asyncio
+import logging
 import os
 
 from dotenv import load_dotenv
@@ -13,6 +14,7 @@ from src.ui.components.chat_panel import ChatPanel
 from src.ui.components.note_viewer import NoteViewerPanel
 from src.ui.components.settings_modal import SettingsModal
 from src.ui.components.sidebar import SidebarPanel
+from src.utils.logger import setup_logging
 
 load_dotenv(".env.local")
 
@@ -32,9 +34,11 @@ class SecondBrainApp(App):
     )
 
     def __init__(self) -> None:
+        setup_logging()
         super().__init__()
         self.agent = SecondBrainAgent()
         self.tui_clipboard = None
+        logging.getLogger("second_brain").info("SecondBrainApp initialized.")
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -71,13 +75,16 @@ class SecondBrainApp(App):
 
         chat_panel = self.query_one(ChatPanel)
         chat_panel.mount_message("Agent", "*🔄 Syncing your notes (RAG) in the background...*")
+        logging.getLogger("second_brain").info("Background RAG sync started.")
 
         try:
             await asyncio.to_thread(sync_vault_embeddings, self.agent.vault_path)
             chat_panel.mount_message("Agent", "*🟢 RAG sync complete! I now remember all your notes.*")
             chat_panel.update_rag_status()
+            logging.getLogger("second_brain").info("Background RAG sync completed successfully.")
         except Exception as e:
             chat_panel.mount_message("Agent", f"*⚠️ RAG sync failed: {e}*")
+            logging.getLogger("second_brain").error("Background RAG sync failed: %s", e, exc_info=True)
 
     # --- Event Handlers ---
 
@@ -113,6 +120,7 @@ class SecondBrainApp(App):
         if preferences_updated:
             self.agent.load_memory()
             self.notify("Settings saved successfully!", severity="information")
+            logging.getLogger("second_brain").info("Settings saved and reloaded in agent.")
 
     def action_close_viewer(self) -> None:
         """Close the note viewer panel (Escape key)."""
