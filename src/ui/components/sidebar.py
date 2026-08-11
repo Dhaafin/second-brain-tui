@@ -175,7 +175,7 @@ class AestheticDirectoryTree(DirectoryTree):
 
     def action_show_context_menu(self, node) -> None:
         """Display the context menu modal pop-up."""
-        has_clipboard = getattr(self.app, "clipboard", None) is not None
+        has_clipboard = getattr(self.app, "tui_clipboard", None) is not None
         self.app.push_screen(
             ContextMenuModal(node.data.path.name, has_clipboard),
             callback=lambda action: self._handle_context_menu_callback(action, node),
@@ -204,7 +204,7 @@ class AestheticDirectoryTree(DirectoryTree):
         node = self.cursor_node
         if not node or not node.data:
             return
-        self.app.clipboard = {"path": node.data.path, "action": "copy"}
+        self.app.tui_clipboard = {"path": node.data.path, "action": "copy"}
         self.app.notify(f"Copied: {node.data.path.name}")
 
     def action_cut_file(self) -> None:
@@ -212,12 +212,12 @@ class AestheticDirectoryTree(DirectoryTree):
         node = self.cursor_node
         if not node or not node.data:
             return
-        self.app.clipboard = {"path": node.data.path, "action": "cut"}
+        self.app.tui_clipboard = {"path": node.data.path, "action": "cut"}
         self.app.notify(f"Cut: {node.data.path.name}")
 
     def action_paste_file(self) -> None:
         """Paste file from TUI clipboard into currently focused directory."""
-        clipboard = getattr(self.app, "clipboard", None)
+        clipboard = getattr(self.app, "tui_clipboard", None)
         if not clipboard:
             self.app.notify("Clipboard is empty", severity="warning")
             return
@@ -232,7 +232,7 @@ class AestheticDirectoryTree(DirectoryTree):
 
         if not src_path.exists():
             self.app.notify("Source file no longer exists", severity="error")
-            self.app.clipboard = None
+            self.app.tui_clipboard = None
             return
 
         if src_path == dest_path:
@@ -255,7 +255,7 @@ class AestheticDirectoryTree(DirectoryTree):
                 delete_file_index(rel_src)
                 index_file(self.app.agent.vault_path, rel_dest)
 
-                self.app.clipboard = None
+                self.app.tui_clipboard = None
                 self.app.notify(f"Moved {src_path.name}")
 
             self.reload()
