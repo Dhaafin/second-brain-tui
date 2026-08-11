@@ -92,18 +92,44 @@ WELCOME_MESSAGE = """\
 class ChatMessage(Vertical):
     """A single chat message bubble containing header and markdown body."""
 
-    def __init__(self, sender: str, text: str, **kwargs) -> None:
+    def __init__(self, sender: str, text: str, typewriter: bool = False, **kwargs) -> None:
         super().__init__(**kwargs)
         self.sender = sender
-        self.text = text
+        self.full_text = text
+        self.typewriter = typewriter
+        self.current_text = "" if typewriter else text
+        self.char_index = 0
 
     def compose(self):
         if self.sender == "You":
             yield Label("👤 You", classes="chat-bubble-header user-header")
-            yield Markdown(self.text, classes="chat-bubble-content user-content")
+            yield Markdown(self.current_text, classes="chat-bubble-content user-content")
         else:
             yield Label("🏄 Agnes", classes="chat-bubble-header agent-header")
-            yield Markdown(self.text, classes="chat-bubble-content agent-content")
+            yield Markdown(self.current_text, id="message-markdown", classes="chat-bubble-content agent-content")
+
+    def on_mount(self) -> None:
+        if self.typewriter and self.sender != "You":
+            self.typewriter_timer = self.set_interval(0.015, self._tick_typewriter)
+
+    def _tick_typewriter(self) -> None:
+        chunk_size = 6
+        self.char_index += chunk_size
+
+        if self.char_index >= len(self.full_text):
+            self.current_text = self.full_text
+            self.typewriter_timer.stop()
+        else:
+            self.current_text = self.full_text[:self.char_index]
+
+        try:
+            md = self.query_one("#message-markdown", Markdown)
+            md.update(self.current_text)
+
+            container = self.app.query_one("#chat-log-container")
+            container.scroll_end(animate=False)
+        except Exception:
+            pass
 
 
 class ChatPanel(Vertical):
@@ -132,10 +158,7 @@ class ChatPanel(Vertical):
         self.current_agent_status = "is thinking"
 
         # Mount initial welcome message
-        container = self.query_one("#chat-log-container", VerticalScroll)
-        container.mount(
-            ChatMessage(sender="Agent", text=WELCOME_MESSAGE, classes="chat-message chat-message-agent")
-        )
+        self.mount_message("Agent", WELCOME_MESSAGE)
 
         # Update status dashboard values
         self.update_rag_status()
@@ -153,7 +176,8 @@ class ChatPanel(Vertical):
         """Mount a new ChatMessage bubble dynamically and scroll to bottom."""
         container = self.query_one("#chat-log-container", VerticalScroll)
         classes = "chat-message chat-message-agent" if sender == "Agent" else "chat-message chat-message-user"
-        container.mount(ChatMessage(sender=sender, text=text, classes=classes))
+        typewriter = (sender == "Agent")
+        container.mount(ChatMessage(sender=sender, text=text, typewriter=typewriter, classes=classes))
         self.call_after_refresh(self.scroll_chat_to_bottom, container)
 
     def clear_chat_log(self) -> None:
@@ -264,11 +288,7 @@ class ChatPanel(Vertical):
             chat_input.focus()
 
             # Mount agent response bubble
-            container = self.query_one("#chat-log-container", VerticalScroll)
-            container.mount(
-                ChatMessage(sender="Agent", text=response, classes="chat-message chat-message-agent")
-            )
-            self.call_after_refresh(self.scroll_chat_to_bottom, container)
+            self.mount_message("Agent", response)
 
             # Refresh sidebar and trigger notifications
             self.app.query_one("#file-tree").reload()
