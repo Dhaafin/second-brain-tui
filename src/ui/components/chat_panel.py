@@ -36,14 +36,11 @@ class ChatInput(TextArea):
         self.show_line_numbers = False
 
     def on_key(self, event) -> None:
-        if event.key == "enter":
+        if event.key in ("ctrl+j", "ctrl+enter", "ctrl+s"):
             event.prevent_default()
             text_value = self.text.strip()
             if text_value:
                 self.post_message(self.Submitted(self.text))
-        elif event.key == "shift+enter":
-            event.prevent_default()
-            self.insert("\n")
 
 
 WELCOME_MESSAGE = """\
@@ -276,8 +273,13 @@ class ChatPanel(Vertical):
     # --- Mention Autocomplete ---
 
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
-        """Show mention autocomplete when user types @."""
+        """Show mention autocomplete when user types @ and adjust height dynamically."""
         value = event.text_area.text
+
+        # Auto-grow input box height dynamically (min 3, max 8 rows)
+        num_lines = len(value.split("\n"))
+        event.text_area.styles.height = min(max(3, num_lines + 2), 8)
+
         if "@" in value:
             parts = value.split(" ")
             last_part = parts[-1]
