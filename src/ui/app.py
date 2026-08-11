@@ -54,14 +54,12 @@ class SecondBrainApp(App):
         if not os.path.exists(memory_file_path):
             self.agent.awaiting_onboarding_consent = True
             chat_panel = self.query_one(ChatPanel)
-            chat_panel.chat_history.append(
-                "### Agent\n"
+            chat_panel.mount_message(
+                "Agent",
                 "Hi! I noticed you don't have an `Agent Memory.md` file in your vault. "
                 "This file helps me remember your preferences across sessions. "
                 "Do you want me to initialize it for you? (Type **yes** or **no**)"
             )
-            chat_log = chat_panel.query_one("#chat-log", Markdown)
-            chat_log.update("\n\n".join(chat_panel.chat_history))
 
         # Trigger background RAG sync
         self.run_worker(self._sync_rag_background())
@@ -71,26 +69,13 @@ class SecondBrainApp(App):
         from src.rag import sync_vault_embeddings
 
         chat_panel = self.query_one(ChatPanel)
-        chat_log = chat_panel.query_one("#chat-log", Markdown)
-
-        chat_panel.chat_history.append(
-            "### Agent\n*🔄 Syncing your notes (RAG) in the background...*"
-        )
-        chat_log.update("\n\n".join(chat_panel.chat_history))
-        self.call_after_refresh(chat_panel.scroll_chat_to_bottom, chat_log)
+        chat_panel.mount_message("Agent", "*🔄 Syncing your notes (RAG) in the background...*")
 
         try:
             await asyncio.to_thread(sync_vault_embeddings, self.agent.vault_path)
-            chat_panel.chat_history.append(
-                "### Agent\n*🟢 RAG sync complete! I now remember all your notes.*"
-            )
+            chat_panel.mount_message("Agent", "*🟢 RAG sync complete! I now remember all your notes.*")
         except Exception as e:
-            chat_panel.chat_history.append(
-                f"### Agent\n*⚠️ RAG sync failed: {e}*"
-            )
-
-        chat_log.update("\n\n".join(chat_panel.chat_history))
-        self.call_after_refresh(chat_panel.scroll_chat_to_bottom, chat_log)
+            chat_panel.mount_message("Agent", f"*⚠️ RAG sync failed: {e}*")
 
     # --- Event Handlers ---
 
@@ -150,19 +135,13 @@ class SecondBrainApp(App):
         chat_input.disabled = False
         chat_input.focus()
 
-        chat_panel.chat_history.append(
-            "### Agent\n*(Request cancelled by user 🛑)*"
-        )
-        chat_log = chat_panel.query_one("#chat-log", Markdown)
-        chat_log.update("\n\n".join(chat_panel.chat_history))
-        self.call_after_refresh(chat_panel.scroll_chat_to_bottom, chat_log)
+        chat_panel.mount_message("Agent", "*(Request cancelled by user 🛑)*")
 
     def action_clear_chat(self) -> None:
         """Clear chat history and reset agent conversation."""
         chat_panel = self.query_one(ChatPanel)
-        chat_panel.chat_history = []
+        chat_panel.clear_chat_log()
         self.agent.clear_history()
-        chat_panel.query_one("#chat-log", Markdown).update("")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 """Chat Panel — Main chat interface with agent interaction, notifications, and autocomplete."""
 
 from textual.message import Message
-from textual.containers import Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.widgets import Label, Markdown, OptionList, TextArea
 
 
@@ -89,18 +89,34 @@ WELCOME_MESSAGE = """\
 """
 
 
+class ChatMessage(Vertical):
+    """A single chat message bubble containing header and markdown body."""
+
+    def __init__(self, sender: str, text: str, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.sender = sender
+        self.text = text
+
+    def compose(self):
+        if self.sender == "You":
+            yield Label("👤 You", classes="chat-bubble-header user-header")
+            yield Markdown(self.text, classes="chat-bubble-content user-content")
+        else:
+            yield Label("🏄 Agnes", classes="chat-bubble-header agent-header")
+            yield Markdown(self.text, classes="chat-bubble-content agent-content")
+
+
 class ChatPanel(Vertical):
     """Main chat panel handling user input, agent responses, and notifications."""
 
     def compose(self):
-        yield FocusableMarkdown(id="chat-log")
+        yield VerticalScroll(id="chat-log-container")
         yield Label("", id="loading-status")
         yield OptionList(id="mention-autocomplete")
         yield ChatInput(id="chat-input")
 
     def on_mount(self) -> None:
         self.query_one("#mention-autocomplete").display = False
-        self.chat_history: list[str] = [WELCOME_MESSAGE]
 
         # Surf animation state
         self.surf_pos = 0
@@ -111,12 +127,27 @@ class ChatPanel(Vertical):
         self.elapsed_time = 0.0
         self.current_agent_status = "is thinking"
 
-        chat_log = self.query_one("#chat-log", Markdown)
-        chat_log.update("\n\n".join(self.chat_history))
+        # Mount initial welcome message
+        container = self.query_one("#chat-log-container", VerticalScroll)
+        container.mount(
+            ChatMessage(sender="Agent", text=WELCOME_MESSAGE, classes="chat-message chat-message-agent")
+        )
 
-    def scroll_chat_to_bottom(self, chat_log: Markdown) -> None:
-        """Scroll the chat log to the very bottom."""
-        chat_log.scroll_end(animate=False)
+    def scroll_chat_to_bottom(self, container) -> None:
+        """Scroll the chat log container to the very bottom."""
+        container.scroll_end(animate=False)
+
+    def mount_message(self, sender: str, text: str) -> None:
+        """Mount a new ChatMessage bubble dynamically and scroll to bottom."""
+        container = self.query_one("#chat-log-container", VerticalScroll)
+        classes = "chat-message chat-message-agent" if sender == "Agent" else "chat-message chat-message-user"
+        container.mount(ChatMessage(sender=sender, text=text, classes=classes))
+        self.call_after_refresh(self.scroll_chat_to_bottom, container)
+
+    def clear_chat_log(self) -> None:
+        """Clear all chat bubbles from the container."""
+        container = self.query_one("#chat-log-container", VerticalScroll)
+        container.remove_children()
 
     # --- Surf Loading Animation ---
 
@@ -161,16 +192,19 @@ class ChatPanel(Vertical):
         if not user_text:
             return
 
-        chat_log = self.query_one("#chat-log", Markdown)
         chat_input = self.query_one("#chat-input", ChatInput)
         loading_status = self.query_one("#loading-status", Label)
 
-        # Append user message and update display
+        # Disable input and clear text
         chat_input.disabled = True
-        self.chat_history.append(f"### You\n{user_text}")
-        chat_log.update("\n\n".join(self.chat_history))
         chat_input.text = ""
-        self.call_after_refresh(self.scroll_chat_to_bottom, chat_log)
+
+        # Mount user message bubble
+        container = self.query_one("#chat-log-container", VerticalScroll)
+        container.mount(
+            ChatMessage(sender="You", text=user_text, classes="chat-message chat-message-user")
+        )
+        self.call_after_refresh(self.scroll_chat_to_bottom, container)
 
         # Reset and start loading animation
         self.surf_pos = 0
@@ -184,7 +218,6 @@ class ChatPanel(Vertical):
 
     async def _get_agent_response(self, prompt: str) -> None:
         """Run the agent request in a background thread and display the response."""
-        chat_log = self.query_one("#chat-log", Markdown)
         chat_input = self.query_one("#chat-input", ChatInput)
         loading_status = self.query_one("#loading-status", Label)
 
@@ -209,10 +242,12 @@ class ChatPanel(Vertical):
             chat_input.disabled = False
             chat_input.focus()
 
-            # Append agent response and scroll
-            self.chat_history.append(f"### Agent\n{response}")
-            chat_log.update("\n\n".join(self.chat_history))
-            self.call_after_refresh(self.scroll_chat_to_bottom, chat_log)
+            # Mount agent response bubble
+            container = self.query_one("#chat-log-container", VerticalScroll)
+            container.mount(
+                ChatMessage(sender="Agent", text=response, classes="chat-message chat-message-agent")
+            )
+            self.call_after_refresh(self.scroll_chat_to_bottom, container)
 
             # Refresh sidebar and trigger notifications
             self.app.query_one("#file-tree").reload()
