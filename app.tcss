@@ -313,3 +313,63 @@ SettingsModal {
     background: #cba6f7;
     color: #1e1e2e;
 }
+
+/* === File Modals === */
+ConfirmModal, PromptModal, ContextMenuModal {
+    align: center middle;
+    background: rgba(0, 0, 0, 0.6);
+}
+
+#confirm-container, #prompt-container, #context-menu-container {
+    width: 45;
+    height: auto;
+    background: #1e1e2e;
+    border: thick #cba6f7;
+    padding: 1 2;
+    layout: vertical;
+}
+
+#context-menu-container {
+    width: 32;
+    padding: 1;
+}
+
+#confirm-message, #prompt-title, #context-menu-title {
+    color: #cdd6f4;
+    margin-bottom: 1;
+    text-align: center;
+}
+
+#context-menu-title {
+    color: #cba6f7;
+    text-style: bold;
+}
+
+#context-menu-list {
+    background: transparent;
+    border: none;
+    height: auto;
+    max-height: 8;
+}
+
+#prompt-input {
+    width: 100%;
+    margin-bottom: 1;
+    background: #313244;
+    border: tall #45475a;
+    color: #cdd6f4;
+}
+
+#prompt-input:focus {
+    border: double #cba6f7;
+}
+
+#confirm-buttons, #prompt-buttons {
+    align: right middle;
+    layout: horizontal;
+    height: 3;
+}
+
+#confirm-buttons Button, #prompt-buttons Button {
+    margin-left: 1;
+}

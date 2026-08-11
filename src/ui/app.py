@@ -34,6 +34,7 @@ class SecondBrainApp(App):
     def __init__(self) -> None:
         super().__init__()
         self.agent = SecondBrainAgent()
+        self.clipboard = None
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
