@@ -21,3 +21,7 @@ db.sqlite3
 
 # AI Agents
 .agents
+
+# Vector Database
+.qdrant_notes.db*
+test_qdrant.db*

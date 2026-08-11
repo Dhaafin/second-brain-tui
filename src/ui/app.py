@@ -54,6 +54,30 @@ class SecondBrainApp(App):
             chat_log = chat_panel.query_one("#chat-log", Markdown)
             chat_log.update("\n\n".join(chat_panel.chat_history))
 
+        # Picu sinkronisasi RAG di latar belakang secara asinkronus
+        self.run_worker(self.sync_rag_in_background())
+
+    async def sync_rag_in_background(self) -> None:
+        """Sinkronisasi berkas vault lokal dengan Qdrant secara asinkronus di latar belakang."""
+        from src.rag import sync_vault_embeddings
+        import asyncio
+
+        chat_panel = self.query_one(ChatPanel)
+        chat_panel.chat_history.append("### Agent\n*🔄 Menyinkronkan catatan Anda (RAG) di latar belakang...*")
+        chat_log = chat_panel.query_one("#chat-log", Markdown)
+        chat_log.update("\n\n".join(chat_panel.chat_history))
+        chat_panel.scroll_chat_to_bottom(chat_log)
+
+        try:
+            # Jalankan pemindaian inkremental di thread terpisah agar UI tidak membeku
+            await asyncio.to_thread(sync_vault_embeddings, self.agent.vault_path)
+            chat_panel.chat_history.append("### Agent\n*🟢 Sinkronisasi RAG selesai! Saya sudah mengingat seluruh peta catatan Anda.*")
+        except Exception as e:
+            chat_panel.chat_history.append(f"### Agent\n*⚠️ Gagal menyinkronkan RAG: {e}*")
+
+        chat_log.update("\n\n".join(chat_panel.chat_history))
+        chat_panel.scroll_chat_to_bottom(chat_log)
+
     def on_directory_tree_file_selected(
         self, event: DirectoryTree.FileSelected
     ) -> None:
