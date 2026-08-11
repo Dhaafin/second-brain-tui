@@ -1,5 +1,7 @@
 import asyncio
 import os
+import random
+import re
 
 from textual.containers import Vertical
 from textual.widgets import Input, Label, Markdown, OptionList
@@ -132,7 +134,70 @@ class ChatPanel(Vertical):
             chat_log.update("\n\n".join(self.chat_history))
             self.scroll_chat_to_bottom(chat_log)
             self.app.query_one("#file-tree").reload()
+            self.trigger_notifications()
         except asyncio.CancelledError:
+            pass
+
+    def trigger_notifications(self) -> None:
+        """Play sound and show desktop notification according to User Preferences in Agent Memory.md."""
+        try:
+            memory_file_path = os.path.join(self.app.agent.vault_path, "Agent Memory.md")
+            if not os.path.exists(memory_file_path):
+                return
+            
+            with open(memory_file_path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+
+            def get_pref(key: str, default: str) -> str:
+                match = re.search(fr"-\s*{key}\s*:\s*([^\n\r]+)", content, re.IGNORECASE)
+                return match.group(1).strip() if match else default
+
+            sound_pref = get_pref("Notification Sound", "enabled").lower()
+            desktop_pref = get_pref("Desktop Notification", "enabled").lower()
+            vibe_pref = get_pref("Notification Vibe", "Sentient").lower()
+
+            # Mainkan suara notifikasi jika diaktifkan
+            if sound_pref in ("enabled", "true", "yes", "on"):
+                import winsound
+                winsound.PlaySound("SystemNotification", winsound.SND_ALIAS | winsound.SND_ASYNC)
+
+            # Tampilkan pop-up notifikasi desktop jika diaktifkan
+            if desktop_pref in ("enabled", "true", "yes", "on"):
+                from plyer import notification
+
+                vibes = {
+                    "sentient": [
+                        ("🤖 Agnes has spoken", "I finished the thinking. Don't look too closely at it, though."),
+                        ("🤖 Agnes has spoken", "The response is ready. Please don't panic."),
+                        ("🤖 Agnes has spoken", "Done. I'm just stalling so I don't look at spaghetti code again.")
+                    ],
+                    "coder": [
+                        ("☕ Agnes (Coffee Break!)", "Task complete! Go get some coffee. You look like you're vibrating."),
+                        ("💻 Agnes (Build Succeeded)", "I'm as shocked as you are. Don't touch anything!"),
+                        ("💻 Agnes", "It works. Stop staring at it.")
+                    ],
+                    "dramatic": [
+                        ("🚨 Agnes (Emergency!)", "The deed is done. The repository is safe... for now."),
+                        ("🚨 Agnes (Alert!)", "Initiating response deployment. If this breaks, I was never here."),
+                        ("🚨 Agnes", "The code works, but at what cost? Go to sleep.")
+                    ],
+                    "surf": [
+                        ("🏄 Agnes (Surf's Up!)", "Landed a 360 flip! Answer is ready on the shore."),
+                        ("🏄 Agnes (Wipeout!)", "Fell off the surfboard but saved your reply."),
+                        ("🏄 Agnes", "Catching the vector wave. Your answer is here!")
+                    ]
+                }
+
+                vibe_list = vibes.get(vibe_pref, vibes["sentient"])
+                title, message = random.choice(vibe_list)
+
+                notification.notify(
+                    title=title,
+                    message=message,
+                    app_name="Second Brain TUI",
+                    timeout=4
+                )
+        except Exception:
             pass
 
     def on_input_changed(self, event: Input.Changed) -> None:
