@@ -31,6 +31,9 @@ class SecondBrainApp(App):
         ("c", "clear_chat", "Clear Chat"),
         ("escape", "close_viewer", "Close Note"),
         ("ctrl+c", "cancel_agent", "Cancel Agent"),
+        ("f1", "focus_sidebar", "Focus Sidebar"),
+        ("f2", "focus_input", "Focus Chat"),
+        ("f3", "focus_viewer", "Focus Viewer"),
     )
 
     def __init__(self) -> None:
@@ -53,7 +56,9 @@ class SecondBrainApp(App):
         yield Footer()
 
     def on_mount(self) -> None:
-        self.query_one("#note-viewer-container").display = False
+        container = self.query_one("#note-viewer-container")
+        container.display = False
+        container.styles.height = 0
 
         memory_file_path = os.path.join(self.agent.vault_path, "Agent Memory.md")
         if not os.path.exists(memory_file_path):
@@ -91,14 +96,19 @@ class SecondBrainApp(App):
     def on_directory_tree_file_selected(
         self, event: DirectoryTree.FileSelected
     ) -> None:
-        """Open a file from the sidebar in the note viewer panel."""
+        """Open a file from the sidebar in the note viewer panel with slide-down animation."""
         file_path = event.path
         if file_path.suffix.lower() in (".md", ".txt", ".json", ".py", ".tcss", ".env", ".local"):
             try:
                 content = file_path.read_text(encoding="utf-8", errors="ignore")
                 self.query_one("#note-viewer", Markdown).update(content)
                 self.query_one("#note-viewer-title", Label).update(f"📄 {file_path.name}")
-                self.query_one("#note-viewer-container").display = True
+                
+                container = self.query_one("#note-viewer-container")
+                if not container.display or container.styles.height.value == 0:
+                    container.display = True
+                    container.styles.height = 0
+                    container.animate("styles.height", 18, duration=0.35, easing="out_cubic")
             except OSError:
                 pass
 
@@ -123,8 +133,29 @@ class SecondBrainApp(App):
             logging.getLogger("second_brain").info("Settings saved and reloaded in agent.")
 
     def action_close_viewer(self) -> None:
-        """Close the note viewer panel (Escape key)."""
-        self.query_one("#note-viewer-container").display = False
+        """Close the note viewer panel with slide-up animation (Escape key)."""
+        container = self.query_one("#note-viewer-container")
+        if container.display:
+            def set_hidden():
+                container.display = False
+            container.animate("styles.height", 0, duration=0.3, easing="out_cubic", callback=set_hidden)
+
+    def action_focus_sidebar(self) -> None:
+        """Focus the sidebar explorer panel (F1)."""
+        self.query_one("#file-tree").focus()
+
+    def action_focus_input(self) -> None:
+        """Focus the chat input field (F2)."""
+        self.query_one("#chat-input").focus()
+
+    def action_focus_viewer(self) -> None:
+        """Focus the note viewer markdown panel (F3)."""
+        try:
+            viewer = self.query_one("#note-viewer")
+            if viewer:
+                viewer.focus()
+        except Exception:
+            pass
 
     def action_cancel_agent(self) -> None:
         """Cancel a running AI request (Ctrl+C)."""

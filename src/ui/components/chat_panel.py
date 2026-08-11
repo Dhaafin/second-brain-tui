@@ -10,6 +10,8 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.widgets import Label, Markdown, OptionList, TextArea
 
+from src.ui.components.settings_modal import SettingsModal
+
 class FocusableMarkdown(Markdown):
     """Markdown widget that can accept keyboard focus for scrolling."""
 
@@ -240,6 +242,26 @@ class ChatPanel(Vertical):
         chat_input = self.query_one("#chat-input", ChatInput)
         loading_status = self.query_one("#loading-status", Label)
 
+        # Handle slash commands directly on Ctrl+Enter
+        if user_text.startswith("/"):
+            chat_input.text = ""
+            if user_text == "/settings":
+                self.app.push_screen(SettingsModal())
+                return
+            elif user_text == "/clear":
+                self.clear_chat_log()
+                self.app.notify("Chat log cleared")
+                return
+            elif user_text == "/sync-rag":
+                self.app.run_worker(self.app._sync_rag_background())
+                return
+            elif user_text == "/init-memory":
+                # Fall through to let agent process /init-memory
+                pass
+            else:
+                self.app.notify(f"Unknown command: {user_text}", severity="warning")
+                return
+
         # Disable input and clear text
         chat_input.disabled = True
         chat_input.text = ""
@@ -376,19 +398,23 @@ class ChatPanel(Vertical):
     # --- Mention Autocomplete ---
 
     def on_text_area_changed(self, event: TextArea.Changed) -> None:
-        """Show mention autocomplete when user types @ and adjust height dynamically."""
+        """Show mention or command autocomplete and adjust height dynamically."""
         value = event.text_area.text
 
         # Auto-grow input box height dynamically (min 3, max 8 rows)
         num_lines = len(value.split("\n"))
         event.text_area.styles.height = min(max(3, num_lines + 2), 8)
 
-        if "@" in value:
+        if value:
             parts = value.split(" ")
             last_part = parts[-1]
             if last_part.startswith("@"):
                 query = last_part[1:].lower()
                 self._show_mention_autocomplete(query)
+                return
+            elif last_part.startswith("/"):
+                query = last_part[1:].lower()
+                self._show_command_autocomplete(query)
                 return
         self._hide_mention_autocomplete()
 
@@ -413,14 +439,54 @@ class ChatPanel(Vertical):
         else:
             autocomplete.display = False
 
+    def _show_command_autocomplete(self, query: str) -> None:
+        """Display matching slash commands in the autocomplete dropdown."""
+        autocomplete = self.query_one("#mention-autocomplete", OptionList)
+        autocomplete.clear_options()
+
+        commands = [
+            "/settings",
+            "/clear",
+            "/sync-rag",
+            "/init-memory",
+        ]
+        matches = [cmd for cmd in commands if cmd.startswith("/" + query)]
+
+        if matches:
+            for match in matches:
+                autocomplete.add_option(match)
+            autocomplete.display = True
+        else:
+            autocomplete.display = False
+
     def _hide_mention_autocomplete(self) -> None:
         """Hide the mention autocomplete dropdown."""
         self.query_one("#mention-autocomplete", OptionList).display = False
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        """Insert selected mention into the chat input."""
-        selected_option = event.option.prompt
+        """Insert selected mention or execute slash command directly."""
+        selected_option = str(event.option.prompt)
         chat_input = self.query_one("#chat-input", TextArea)
+
+        if selected_option.startswith("/"):
+            # Command selection: clear input, hide dropdown, and execute
+            chat_input.text = ""
+            self._hide_mention_autocomplete()
+
+            if selected_option == "/settings":
+                self.app.push_screen(SettingsModal())
+            elif selected_option == "/clear":
+                self.clear_chat_log()
+                self.app.notify("Chat log cleared")
+            elif selected_option == "/sync-rag":
+                self.app.run_worker(self.app._sync_rag_background())
+            elif selected_option == "/init-memory":
+                # Dispatch submitting /init-memory directly to agent
+                event = ChatInput.Submitted(chat_input, "/init-memory")
+                self.on_chat_input_submitted(event)
+
+            chat_input.focus()
+            return
 
         value = chat_input.text
         parts = value.split(" ")
