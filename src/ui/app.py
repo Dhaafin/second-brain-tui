@@ -108,7 +108,7 @@ class SecondBrainApp(App):
                 if not container.display or container.styles.height.value == 0:
                     container.display = True
                     container.styles.height = 0
-                    container.animate("styles.height", 18, duration=0.35, easing="out_cubic")
+                    container.styles.animate("height", 18, duration=0.35, easing="out_cubic")
             except OSError:
                 pass
 
@@ -138,7 +138,7 @@ class SecondBrainApp(App):
         if container.display:
             def set_hidden():
                 container.display = False
-            container.animate("styles.height", 0, duration=0.3, easing="out_cubic", callback=set_hidden)
+            container.styles.animate("height", 0, duration=0.3, easing="out_cubic", on_complete=set_hidden)
 
     def action_focus_sidebar(self) -> None:
         """Focus the sidebar explorer panel (F1)."""
