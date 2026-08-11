@@ -42,6 +42,36 @@ def delete_file_index(rel_path: str) -> None:
     )
 
 
+def delete_directory_index(dir_path: str) -> None:
+    """Deletes all vector indices associated with files inside a specific directory."""
+    client = get_qdrant_client()
+    init_collection()
+
+    prefix = dir_path.rstrip("/") + "/"
+    records_to_delete = set()
+    offset = None
+
+    while True:
+        records, offset = client.scroll(
+            collection_name=COLLECTION_NAME,
+            limit=100,
+            with_payload=["filename"],
+            with_vectors=False,
+            offset=offset,
+        )
+        for record in records:
+            payload = record.payload
+            if payload and "filename" in payload:
+                filename = payload["filename"]
+                if filename.startswith(prefix) or filename == dir_path:
+                    records_to_delete.add(filename)
+        if offset is None:
+            break
+
+    for filename in records_to_delete:
+        delete_file_index(filename)
+
+
 def index_file(vault_path: str, rel_path: str) -> None:
     """Read the file, split it, create embeddings, and save them to Qdrant."""
     client = get_qdrant_client()

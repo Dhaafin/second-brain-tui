@@ -168,6 +168,33 @@ def restore_from_trash(vault_path:str, filename:str) -> str:
     except OSError:
         return f"Error: Failed to restore '{filename}' due to access issues."
 
+def delete_directory_to_trash(vault_path: str, dir_path: str) -> str:
+    resolved_vault = Path(vault_path).resolve()
+    src_path = (resolved_vault / dir_path).resolve()
+    dest_path = (resolved_vault / ".trash" / dir_path).resolve()
+
+    if not src_path.is_relative_to(resolved_vault) or src_path == resolved_vault:
+        return "Error: Access denied. Cannot delete directory outside or equal to vault root"
+
+    if not src_path.exists():
+        return f"Error: Directory '{dir_path}' not found."
+
+    try:
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+        import shutil
+        shutil.move(str(src_path), str(dest_path))
+
+        # Clear matching cache entries
+        prefix = dir_path.rstrip("/") + "/"
+        keys_to_remove = [k for k in _notes_cache if k.startswith(prefix) or k == dir_path]
+        for k in keys_to_remove:
+            _notes_cache.pop(k, None)
+
+        return f"Success: Moved directory '{dir_path}' to trash"
+    except OSError as e:
+        return f"Error: Failed to move directory '{dir_path}' to trash: {e}"
+
 def get_all_note_paths(vault_path: str) -> list[str]:
     """Retrieve all cached note paths from the vault."""
     _ensure_cache_loaded(vault_path)

@@ -5,9 +5,10 @@ import re
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from src.rag import delete_file_index, index_file, query_semantic_notes
+from src.rag import delete_directory_index, delete_file_index, index_file, query_semantic_notes
 from src.vault import (
     append_note,
+    delete_directory_to_trash,
     delete_to_trash,
     generate_vault_index,
     list_vault_directory,
@@ -139,6 +140,23 @@ AI_TOOLS = [
             "parameters": {
                 "type": "object",
                 "properties": {},
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "delete_directory",
+            "description": "Delete a folder/directory and all its contents by moving it to the trash.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "dir_path": {
+                        "type": "string",
+                        "description": "The relative directory path, e.g., '03 Resources/Literasi Digital'.",
+                    }
+                },
+                "required": ["dir_path"],
             },
         },
     },
@@ -288,10 +306,19 @@ class SecondBrainAgent:
 
         self.messages.append({"role": "user", "content": user_message_to_send})
 
-        for _ in range(self.max_steps):
+        for step in range(self.max_steps):
+            steps_remaining = self.max_steps - step
+            step_notice = (
+                f"[SYSTEM NOTICE: You are at step {step + 1} of {self.max_steps}. "
+                f"You have {steps_remaining} steps remaining in this turn to complete all your tasks. "
+                "If you need to perform many actions, use batch tools (like delete_directory) if available, "
+                "or complete what you can and ask the user to confirm to continue in the next turn.]"
+            )
+            api_messages = [{"role": "system", "content": step_notice}] + self.messages
+
             response = client.chat.completions.create(
                 model=self.model,
-                messages=self.messages,
+                messages=api_messages,
                 tools=AI_TOOLS,
                 tool_choice="auto",
             )
@@ -354,6 +381,14 @@ class SecondBrainAgent:
                     tool_output = delete_to_trash(self.vault_path, filename)
                     if not tool_output.startswith("Error"):
                         delete_file_index(filename)
+
+                elif function_name == "delete_directory":
+                    dir_path = function_args.get("dir_path")
+                    if on_status_update:
+                        on_status_update(f"deleting folder '{dir_path}' to trash")
+                    tool_output = delete_directory_to_trash(self.vault_path, dir_path)
+                    if not tool_output.startswith("Error"):
+                        delete_directory_index(dir_path)
 
                 elif function_name == "restore_from_trash":
                     filename = function_args.get("filename")
