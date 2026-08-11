@@ -29,6 +29,7 @@ class ChatInput(TextArea):
         ("ctrl+a", "select_all", "Select All"),
         ("ctrl+home", "home(True)", "Select to Start"),
         ("ctrl+end", "end(True)", "Select to End"),
+        ("ctrl+e", "open_editor", "Open Editor"),
     )
 
     def __init__(self, **kwargs):
@@ -41,6 +42,32 @@ class ChatInput(TextArea):
             text_value = self.text.strip()
             if text_value:
                 self.post_message(self.Submitted(self.text))
+
+    def action_open_editor(self) -> None:
+        """Open system default text editor (Notepad on Windows) to edit long prompts."""
+        import tempfile
+        import subprocess
+
+        temp_fd, temp_path = tempfile.mkstemp(suffix=".md", prefix="sb_prompt_")
+        try:
+            os.write(temp_fd, self.text.encode("utf-8"))
+            os.close(temp_fd)
+
+            with self.app.suspend():
+                subprocess.run(["notepad.exe", temp_path])
+
+            with open(temp_path, "r", encoding="utf-8", errors="ignore") as f:
+                new_text = f.read()
+
+            self.text = new_text
+            self.move_cursor((len(new_text.split("\n")) - 1, len(new_text.split("\n")[-1])))
+        except Exception:
+            pass
+        finally:
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
 
 
 WELCOME_MESSAGE = """\
