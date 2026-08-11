@@ -1,13 +1,14 @@
 """Chat Panel — Main chat interface with agent interaction, notifications, and autocomplete."""
 
+from textual.message import Message
+from textual.containers import Vertical
+from textual.widgets import Label, Markdown, OptionList, TextArea
+
+
 import asyncio
 import os
 import random
 import re
-
-from textual.containers import Vertical
-from textual.widgets import Input, Label, Markdown, OptionList
-
 
 class FocusableMarkdown(Markdown):
     """Markdown widget that can accept keyboard focus for scrolling."""
@@ -15,14 +16,34 @@ class FocusableMarkdown(Markdown):
     can_focus = True
 
 
-class ChatInput(Input):
-    """Custom Input with standard selection and cursor bindings."""
+class ChatInput(TextArea):
+    """Custom TextArea acting as a chat input with Shift+Enter for newline and Enter for submit."""
+
+    class Submitted(Message):
+        """Submitted message for ChatInput."""
+        def __init__(self, value: str) -> None:
+            super().__init__()
+            self.value = value
 
     BINDINGS = (
         ("ctrl+a", "select_all", "Select All"),
         ("ctrl+home", "home(True)", "Select to Start"),
         ("ctrl+end", "end(True)", "Select to End"),
     )
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.show_line_numbers = False
+
+    def on_key(self, event) -> None:
+        if event.key == "enter":
+            event.prevent_default()
+            text_value = self.text.strip()
+            if text_value:
+                self.post_message(self.Submitted(self.text))
+        elif event.key == "shift+enter":
+            event.prevent_default()
+            self.insert("\n")
 
 
 WELCOME_MESSAGE = """\
@@ -51,9 +72,7 @@ class ChatPanel(Vertical):
         yield FocusableMarkdown(id="chat-log")
         yield Label("", id="loading-status")
         yield OptionList(id="mention-autocomplete")
-        yield ChatInput(
-            placeholder="Type a message to Agnes...", id="chat-input"
-        )
+        yield ChatInput(id="chat-input")
 
     def on_mount(self) -> None:
         self.query_one("#mention-autocomplete").display = False
@@ -112,21 +131,21 @@ class ChatPanel(Vertical):
 
     # --- Message Handling ---
 
-    def on_input_submitted(self, event: Input.Submitted) -> None:
+    def on_chat_input_submitted(self, event: ChatInput.Submitted) -> None:
         """Handle user message submission."""
         user_text = event.value.strip()
         if not user_text:
             return
 
         chat_log = self.query_one("#chat-log", Markdown)
-        chat_input = self.query_one("#chat-input", Input)
+        chat_input = self.query_one("#chat-input", ChatInput)
         loading_status = self.query_one("#loading-status", Label)
 
         # Append user message and update display
         chat_input.disabled = True
         self.chat_history.append(f"### You\n{user_text}")
         chat_log.update("\n\n".join(self.chat_history))
-        chat_input.value = ""
+        chat_input.text = ""
         self.call_after_refresh(self.scroll_chat_to_bottom, chat_log)
 
         # Reset and start loading animation
@@ -142,7 +161,7 @@ class ChatPanel(Vertical):
     async def _get_agent_response(self, prompt: str) -> None:
         """Run the agent request in a background thread and display the response."""
         chat_log = self.query_one("#chat-log", Markdown)
-        chat_input = self.query_one("#chat-input", Input)
+        chat_input = self.query_one("#chat-input", ChatInput)
         loading_status = self.query_one("#loading-status", Label)
 
         try:
@@ -256,9 +275,9 @@ class ChatPanel(Vertical):
 
     # --- Mention Autocomplete ---
 
-    def on_input_changed(self, event: Input.Changed) -> None:
+    def on_text_area_changed(self, event: TextArea.Changed) -> None:
         """Show mention autocomplete when user types @."""
-        value = event.value
+        value = event.text_area.text
         if "@" in value:
             parts = value.split(" ")
             last_part = parts[-1]
@@ -296,9 +315,9 @@ class ChatPanel(Vertical):
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         """Insert selected mention into the chat input."""
         selected_option = event.option.prompt
-        chat_input = self.query_one("#chat-input", Input)
+        chat_input = self.query_one("#chat-input", TextArea)
 
-        value = chat_input.value
+        value = chat_input.text
         parts = value.split(" ")
 
         if " " in selected_option:
@@ -307,7 +326,7 @@ class ChatPanel(Vertical):
             replacement = f"@{selected_option}"
 
         parts[-1] = replacement
-        chat_input.value = " ".join(parts) + " "
+        chat_input.text = " ".join(parts) + " "
 
         self._hide_mention_autocomplete()
         chat_input.focus()

@@ -146,7 +146,7 @@ class SecondBrainApp(App):
         loading_status = chat_panel.query_one("#loading-status", Label)
         loading_status.display = False
 
-        chat_input = chat_panel.query_one("#chat-input", Input)
+        chat_input = chat_panel.query_one("#chat-input")
         chat_input.disabled = False
         chat_input.focus()
 
