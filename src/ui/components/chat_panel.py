@@ -1,7 +1,7 @@
 """Chat Panel — Main chat interface with agent interaction, notifications, and autocomplete."""
 
 from textual.message import Message
-from textual.containers import Vertical, VerticalScroll
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Label, Markdown, OptionList, TextArea
 
 
@@ -112,6 +112,10 @@ class ChatPanel(Vertical):
     def compose(self):
         yield VerticalScroll(id="chat-log-container")
         yield Label("", id="loading-status")
+        with Horizontal(id="status-dashboard"):
+            yield Label("🟢 RAG: Calculating...", id="dashboard-rag")
+            yield Label("🤖 Model: Loading...", id="dashboard-model")
+            yield Label("💡 Ctrl+E to edit prompt", id="dashboard-tip")
         yield OptionList(id="mention-autocomplete")
         yield ChatInput(id="chat-input")
 
@@ -133,6 +137,14 @@ class ChatPanel(Vertical):
             ChatMessage(sender="Agent", text=WELCOME_MESSAGE, classes="chat-message chat-message-agent")
         )
 
+        # Update status dashboard values
+        self.update_rag_status()
+        try:
+            model_name = self.app.agent.model
+            self.query_one("#dashboard-model", Label).update(f"🤖 Model: {model_name}")
+        except Exception:
+            pass
+
     def scroll_chat_to_bottom(self, container) -> None:
         """Scroll the chat log container to the very bottom."""
         container.scroll_end(animate=False)
@@ -148,6 +160,15 @@ class ChatPanel(Vertical):
         """Clear all chat bubbles from the container."""
         container = self.query_one("#chat-log-container", VerticalScroll)
         container.remove_children()
+
+    def update_rag_status(self) -> None:
+        """Update RAG status label with current vault note count."""
+        try:
+            from src.vault import get_all_note_paths
+            notes_count = len(get_all_note_paths(self.app.agent.vault_path))
+            self.query_one("#dashboard-rag", Label).update(f"🟢 RAG: {notes_count} Notes")
+        except Exception:
+            pass
 
     # --- Surf Loading Animation ---
 

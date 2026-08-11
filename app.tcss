@@ -154,6 +154,34 @@
     padding: 0;
 }
 
+/* === Status Dashboard === */
+#status-dashboard {
+    height: 1;
+    background: transparent;
+    padding: 0 1;
+    layout: horizontal;
+    margin-top: 1;
+}
+
+#status-dashboard Label {
+    margin-right: 4;
+    text-style: bold;
+}
+
+#dashboard-rag {
+    color: #a6e3a1; /* Catppuccin Green */
+}
+
+#dashboard-model {
+    color: #fab387; /* Catppuccin Peach */
+}
+
+#dashboard-tip {
+    color: #94e2d5; /* Catppuccin Teal */
+    width: 1fr;
+    text-align: right;
+}
+
 
 /* === Loading Status === */
 

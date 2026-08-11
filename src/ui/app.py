@@ -74,6 +74,7 @@ class SecondBrainApp(App):
         try:
             await asyncio.to_thread(sync_vault_embeddings, self.agent.vault_path)
             chat_panel.mount_message("Agent", "*🟢 RAG sync complete! I now remember all your notes.*")
+            chat_panel.update_rag_status()
         except Exception as e:
             chat_panel.mount_message("Agent", f"*⚠️ RAG sync failed: {e}*")
 
