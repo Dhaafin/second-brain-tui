@@ -101,19 +101,16 @@ class SecondBrainApp(App):
     def on_directory_tree_file_selected(
         self, event: DirectoryTree.FileSelected
     ) -> None:
-        """Open a file from the sidebar in the note viewer panel with slide-out animation."""
+        """Open a file from the sidebar in the note viewer panel."""
         file_path = event.path
         if file_path.suffix.lower() in (".md", ".txt", ".json", ".py", ".tcss", ".env", ".local"):
             try:
                 content = file_path.read_text(encoding="utf-8", errors="ignore")
                 self.query_one("#note-viewer", Markdown).update(content)
                 self.query_one("#note-viewer-title", Label).update(f"📄 {file_path.name}")
-                
+
                 container = self.query_one("#note-viewer-container")
-                if not container.display or container.styles.width.value == 0:
-                    container.display = True
-                    container.styles.width = 0
-                    container.styles.animate("width", "55%", duration=0.35, easing="out_cubic")
+                container.display = True
             except OSError:
                 pass
 
@@ -141,12 +138,9 @@ class SecondBrainApp(App):
             logging.getLogger("second_brain").info("Settings saved and reloaded in agent.")
 
     def action_close_viewer(self) -> None:
-        """Close the note viewer panel with slide-in animation (Escape key)."""
+        """Close the note viewer panel instantly (Escape key)."""
         container = self.query_one("#note-viewer-container")
-        if container.display:
-            def set_hidden():
-                container.display = False
-            container.styles.animate("width", 0, duration=0.3, easing="out_cubic", on_complete=set_hidden)
+        container.display = False
 
     def action_focus_sidebar(self) -> None:
         """Focus the sidebar explorer panel (F1)."""

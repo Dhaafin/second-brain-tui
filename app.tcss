@@ -260,7 +260,7 @@ FooterKey {
 /* === Settings Modal === */
 SettingsModal {
     align: center middle;
-    background: rgba(0, 0, 0, 0.0);
+    background: rgba(0, 0, 0, 0.6);
 }
 
 #settings-container {
@@ -271,7 +271,7 @@ SettingsModal {
     border-title-color: #cba6f7;
     border-title-style: bold;
     padding: 1 2;
-    opacity: 0.0;
+    opacity: 1.0;
 }
 
 .settings-row {
@@ -312,7 +312,7 @@ SettingsModal {
 /* === File Modals === */
 ConfirmModal, PromptModal, ContextMenuModal {
     align: center middle;
-    background: rgba(0, 0, 0, 0.0);
+    background: rgba(0, 0, 0, 0.6);
 }
 
 #confirm-container, #prompt-container, #context-menu-container {
@@ -321,7 +321,7 @@ ConfirmModal, PromptModal, ContextMenuModal {
     background: #1e1e2e;
     border: thick #cba6f7;
     padding: 1 2;
-    opacity: 0.0;
+    opacity: 1.0;
 }
 
 #context-menu-container {

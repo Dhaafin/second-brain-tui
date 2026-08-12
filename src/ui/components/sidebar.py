@@ -30,22 +30,11 @@ class ConfirmModal(ModalScreen[bool]):
         self.query_one("#confirm-container").border_title = "Confirm"
         self.query_one("#yes-btn").focus()
 
-        # Entry animations
-        self.styles.animate("background", "rgba(0, 0, 0, 0.6)", duration=0.25)
-        container = self.query_one("#confirm-container")
-        container.styles.animate("opacity", 1.0, duration=0.25, easing="out_cubic")
-
-    def dismiss_with_animation(self, result: bool) -> None:
-        self.styles.animate("background", "rgba(0, 0, 0, 0.0)", duration=0.2)
-        container = self.query_one("#confirm-container")
-        container.styles.animate("opacity", 0.0, duration=0.2, easing="in_cubic",
-                                 on_complete=lambda: self.dismiss(result))
-
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "yes-btn":
-            self.dismiss_with_animation(True)
+            self.dismiss(True)
         else:
-            self.dismiss_with_animation(False)
+            self.dismiss(False)
 
 
 class PromptModal(ModalScreen[str]):
@@ -68,25 +57,14 @@ class PromptModal(ModalScreen[str]):
         self.query_one("#prompt-container").border_title = "Input"
         self.query_one("#prompt-input").focus()
 
-        # Entry animations
-        self.styles.animate("background", "rgba(0, 0, 0, 0.6)", duration=0.25)
-        container = self.query_one("#prompt-container")
-        container.styles.animate("opacity", 1.0, duration=0.25, easing="out_cubic")
-
-    def dismiss_with_animation(self, result: str) -> None:
-        self.styles.animate("background", "rgba(0, 0, 0, 0.0)", duration=0.2)
-        container = self.query_one("#prompt-container")
-        container.styles.animate("opacity", 0.0, duration=0.2, easing="in_cubic",
-                                 on_complete=lambda: self.dismiss(result))
-
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "submit-btn":
-            self.dismiss_with_animation(self.query_one("#prompt-input").value)
+            self.dismiss(self.query_one("#prompt-input").value)
         else:
-            self.dismiss_with_animation("")
+            self.dismiss("")
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        self.dismiss_with_animation(event.value)
+        self.dismiss(event.value)
 
 
 class ContextMenuModal(ModalScreen[str]):
@@ -118,25 +96,13 @@ class ContextMenuModal(ModalScreen[str]):
         self.query_one("#context-menu-container").border_title = "Menu"
         self.query_one("#context-menu-list", OptionList).focus()
 
-        # Entry animations
-        self.styles.animate("background", "rgba(0, 0, 0, 0.6)", duration=0.25)
-        container = self.query_one("#context-menu-container")
-        container.styles.animate("opacity", 1.0, duration=0.25, easing="out_cubic")
-
-    def dismiss_with_animation(self, result: str) -> None:
-        self.styles.animate("background", "rgba(0, 0, 0, 0.0)", duration=0.2)
-        container = self.query_one("#context-menu-container")
-        container.styles.animate("opacity", 0.0, duration=0.2, easing="in_cubic",
-                                 on_complete=lambda: self.dismiss(result))
-
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        self.dismiss_with_animation(event.option.id)
+        self.dismiss(event.option.id)
 
     def on_key(self, event) -> None:
         if event.key == "escape":
             event.prevent_default()
-            self.dismiss_with_animation("")
-
+            self.dismiss("")
 
 class AestheticDirectoryTree(DirectoryTree):
     """DirectoryTree with custom emojis and keyboard/mouse file manager actions."""
