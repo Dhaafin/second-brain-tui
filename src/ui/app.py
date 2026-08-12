@@ -56,7 +56,6 @@ class SecondBrainApp(App):
     def on_mount(self) -> None:
         container = self.query_one("#note-viewer-container")
         container.display = False
-        container.styles.width = 0
 
         memory_file_path = os.path.join(self.agent.vault_path, "Agent Memory.md")
         if not os.path.exists(memory_file_path):
