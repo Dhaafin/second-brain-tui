@@ -1,6 +1,7 @@
 from pathlib import Path
 
 _notes_cache = {}
+_folders_cache = []
 _cache_loaded = False
 
 def list_vault_directory(vault_path:str) -> list[str]:
@@ -21,30 +22,40 @@ def list_vault_directory(vault_path:str) -> list[str]:
     return sorted(dirs)
 
 def _ensure_cache_loaded(vault_path: str) -> None:
-    global _cache_loaded
+    global _cache_loaded, _folders_cache
 
     if _cache_loaded:
         return
 
     vault = Path(vault_path)
-    EXCLUDED_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".venv"}
+    EXCLUDED_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".venv", "__pycache__"}
 
     _notes_cache.clear()
+    _folders_cache.clear()
 
-    for file_path in vault.rglob("*.md"):
+    for p in vault.rglob("*"):
         try:
-            if any(part in EXCLUDED_DIRS for part in file_path.parts):
+            if any(part in EXCLUDED_DIRS for part in p.parts):
                 continue
 
-            rel_path = str(file_path.relative_to(vault))
-
-            content = file_path.read_text(encoding="utf-8", errors="ignore")
-
-            _notes_cache[rel_path] = content
+            if p.is_dir():
+                rel_path = str(p.relative_to(vault)).replace("\\", "/")
+                if rel_path:
+                    _folders_cache.append(rel_path)
+            elif p.is_file() and p.suffix == ".md":
+                rel_path = str(p.relative_to(vault)).replace("\\", "/")
+                content = p.read_text(encoding="utf-8", errors="ignore")
+                _notes_cache[rel_path] = content
         except OSError:
             continue
-    
+
+    _folders_cache.sort()
     _cache_loaded = True
+
+def get_all_folder_paths(vault_path: str) -> list[str]:
+    """Retrieve all cached folder paths from the vault."""
+    _ensure_cache_loaded(vault_path)
+    return _folders_cache
 
 def search_notes(vault_path: str, query: str) -> list[str]:
     """Search for keywords in all cached .md files in the Obsidian folder."""
@@ -101,7 +112,19 @@ def write_note(base_dir_str : str, rel_path_str: str, text: str) -> str:
         
         target_file.write_text(text, encoding="utf-8")
 
-        _notes_cache[rel_path_str] = text
+        # Normalize path representation
+        normalized_rel_path = rel_path_str.replace("\\", "/")
+        _notes_cache[normalized_rel_path] = text
+
+        # Update folders cache
+        parent_parts = Path(normalized_rel_path).parent.parts
+        if parent_parts:
+            global _folders_cache
+            for i in range(1, len(parent_parts) + 1):
+                parent_path = "/".join(parent_parts[:i])
+                if parent_path and parent_path not in _folders_cache:
+                    _folders_cache.append(parent_path)
+            _folders_cache.sort()
 
         return f"Success: Note '{rel_path_str}' has been saved."
     except OSError:
@@ -195,6 +218,10 @@ def delete_directory_to_trash(vault_path: str, dir_path: str) -> str:
         keys_to_remove = [k for k in _notes_cache if k.startswith(prefix) or k == dir_path]
         for k in keys_to_remove:
             _notes_cache.pop(k, None)
+
+        # Clear matching folders cache entries
+        global _folders_cache
+        _folders_cache = [f for f in _folders_cache if not (f.startswith(prefix) or f == dir_path)]
 
         return f"Success: Moved directory '{dir_path}' to trash"
     except OSError as e:

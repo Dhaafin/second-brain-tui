@@ -460,26 +460,27 @@ class ChatPanel(Vertical):
                 
         self._hide_mention_autocomplete()
 
-    def _get_note_preview(self, filepath: str) -> str:
-        """Get the first non-empty line of the note as a preview, with caching."""
-        if filepath in self.note_preview_cache:
-            return self.note_preview_cache[filepath]
+    def _get_note_preview(self, rel_path: str) -> str:
+        """Get the first non-empty line of the note as a preview from cache."""
+        if rel_path in self.note_preview_cache:
+            return self.note_preview_cache[rel_path]
 
+        from src.vault import _notes_cache
         preview = ""
         try:
-            if os.path.exists(filepath):
-                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
-                    for line in f:
-                        line_str = line.strip()
-                        if line_str:
-                            # Remove markdown heading symbol
-                            line_str = re.sub(r'^#+\s*', '', line_str)
-                            preview = line_str[:40]
-                            break
+            content = _notes_cache.get(rel_path)
+            if content:
+                for line in content.split("\n"):
+                    line_str = line.strip()
+                    if line_str:
+                        # Remove markdown heading symbol
+                        line_str = re.sub(r'^#+\s*', '', line_str)
+                        preview = line_str[:40]
+                        break
         except Exception:
             pass
 
-        self.note_preview_cache[filepath] = preview
+        self.note_preview_cache[rel_path] = preview
         return preview
 
     def _show_mention_autocomplete(self, query: str) -> None:
@@ -487,10 +488,9 @@ class ChatPanel(Vertical):
         autocomplete = self.query_one("#mention-autocomplete", OptionList)
         autocomplete.clear_options()
 
-        from src.vault import get_all_note_paths
+        from src.vault import get_all_note_paths, get_all_folder_paths
         from rich.text import Text
         from textual.widgets.option_list import Option
-        from pathlib import Path
 
         # Get notes
         all_paths = get_all_note_paths(self.app.agent.vault_path)
@@ -499,22 +499,15 @@ class ChatPanel(Vertical):
         for p in all_paths:
             filename = os.path.basename(p)
             if query in filename.lower():
-                abs_p = os.path.join(self.app.agent.vault_path, p)
-                matches.append(("file", filename, p, abs_p))
+                matches.append(("file", filename, p, p))
 
         # Get folders
         try:
-            resolved_vault = Path(self.app.agent.vault_path).resolve()
-            EXCLUDED_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".venv", "__pycache__"}
-            for p in resolved_vault.rglob("*"):
-                if p.is_dir():
-                    if any(part in EXCLUDED_DIRS for part in p.parts):
-                        continue
-                    rel_path = p.relative_to(resolved_vault)
-                    clean_path = str(rel_path).replace("\\", "/")
-                    folder_name = os.path.basename(clean_path)
-                    if query in folder_name.lower() or query in clean_path.lower():
-                        matches.append(("folder", clean_path, clean_path, str(p)))
+            all_folders = get_all_folder_paths(self.app.agent.vault_path)
+            for clean_path in all_folders:
+                folder_name = os.path.basename(clean_path)
+                if query in folder_name.lower() or query in clean_path.lower():
+                    matches.append(("folder", clean_path, clean_path, ""))
         except Exception:
             pass
 
