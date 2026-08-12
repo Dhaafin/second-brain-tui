@@ -40,6 +40,32 @@ class ChatInput(TextArea):
         self.show_line_numbers = False
 
     def on_key(self, event) -> None:
+        chat_panel = self.parent
+        autocomplete = None
+        if chat_panel:
+            try:
+                autocomplete = chat_panel.query_one("#mention-autocomplete")
+            except Exception:
+                pass
+
+        if autocomplete and autocomplete.display:
+            if event.key == "down":
+                event.prevent_default()
+                autocomplete.action_cursor_down()
+                return
+            elif event.key == "up":
+                event.prevent_default()
+                autocomplete.action_cursor_up()
+                return
+            elif event.key in ("enter", "tab"):
+                event.prevent_default()
+                chat_panel.select_active_autocomplete()
+                return
+            elif event.key == "escape":
+                event.prevent_default()
+                chat_panel._hide_mention_autocomplete()
+                return
+
         if event.key in ("ctrl+j", "ctrl+enter", "ctrl+s"):
             event.prevent_default()
             text_value = self.text.strip()
@@ -150,6 +176,7 @@ class ChatPanel(Vertical):
 
     def on_mount(self) -> None:
         self.query_one("#mention-autocomplete").display = False
+        self.note_preview_cache = {}
 
         # Surf animation state
         self.surf_pos = 0
@@ -404,58 +431,133 @@ class ChatPanel(Vertical):
 
         # Auto-grow input box height dynamically (min 3, max 8 rows)
         num_lines = len(value.split("\n"))
-        event.text_area.styles.height = min(max(3, num_lines + 2), 8)
+        input_height = min(max(3, num_lines + 2), 8)
+        event.text_area.styles.height = input_height
 
-        if value:
-            parts = value.split(" ")
-            last_part = parts[-1]
-            if last_part.startswith("@"):
-                query = last_part[1:].lower()
+        # Sync bottom position of autocomplete menu
+        autocomplete = self.query_one("#mention-autocomplete", OptionList)
+        autocomplete.styles.bottom = input_height
+
+        # Check cursor position to trigger autocomplete
+        cursor_row, cursor_col = event.text_area.cursor_location
+        lines = value.split("\n")
+        if cursor_row < len(lines):
+            current_line = lines[cursor_row]
+            text_before_cursor = current_line[:cursor_col]
+            
+            # Search trigger char @ or / at end of text_before_cursor
+            match_mention = re.search(r'@([^\s]*)$', text_before_cursor)
+            match_cmd = re.search(r'/([^\s]*)$', text_before_cursor)
+            
+            if match_mention:
+                query = match_mention.group(1).lower()
                 self._show_mention_autocomplete(query)
                 return
-            elif last_part.startswith("/"):
-                query = last_part[1:].lower()
+            elif match_cmd:
+                query = match_cmd.group(1).lower()
                 self._show_command_autocomplete(query)
                 return
+                
         self._hide_mention_autocomplete()
 
+    def _get_note_preview(self, filepath: str) -> str:
+        """Get the first non-empty line of the note as a preview, with caching."""
+        if filepath in self.note_preview_cache:
+            return self.note_preview_cache[filepath]
+
+        preview = ""
+        try:
+            if os.path.exists(filepath):
+                with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        line_str = line.strip()
+                        if line_str:
+                            # Remove markdown heading symbol
+                            line_str = re.sub(r'^#+\s*', '', line_str)
+                            preview = line_str[:40]
+                            break
+        except Exception:
+            pass
+
+        self.note_preview_cache[filepath] = preview
+        return preview
+
     def _show_mention_autocomplete(self, query: str) -> None:
-        """Display matching note filenames in the autocomplete dropdown."""
+        """Display matching note filenames in the autocomplete dropdown with rich style."""
         autocomplete = self.query_one("#mention-autocomplete", OptionList)
         autocomplete.clear_options()
 
         from src.vault import get_all_note_paths
+        from rich.text import Text
+        from textual.widgets.option_list import Option
 
         all_paths = get_all_note_paths(self.app.agent.vault_path)
-        matches = [
-            os.path.basename(p)
-            for p in all_paths
-            if query in os.path.basename(p).lower()
-        ][:5]
+        
+        matches = []
+        for p in all_paths:
+            filename = os.path.basename(p)
+            if query in filename.lower():
+                matches.append((filename, p))
+                
+        matches = matches[:5]
 
         if matches:
-            for match in matches:
-                autocomplete.add_option(match)
+            for filename, full_path in matches:
+                preview = self._get_note_preview(full_path)
+                
+                option_text = Text()
+                option_text.append("📝 ", style="bold magenta")
+                
+                lower_fn = filename.lower()
+                idx = lower_fn.find(query)
+                if idx != -1 and query:
+                    option_text.append(filename[:idx], style="bold #cba6f7")
+                    option_text.append(filename[idx:idx+len(query)], style="bold #fab387 underline")
+                    option_text.append(filename[idx+len(query):], style="bold #cba6f7")
+                else:
+                    option_text.append(filename, style="bold #cba6f7")
+                    
+                if preview:
+                    option_text.append(f"  •  {preview}", style="dim #bac2de")
+                    
+                autocomplete.add_option(Option(option_text, id=filename))
             autocomplete.display = True
         else:
             autocomplete.display = False
 
     def _show_command_autocomplete(self, query: str) -> None:
-        """Display matching slash commands in the autocomplete dropdown."""
+        """Display matching slash commands in the autocomplete dropdown with rich style."""
         autocomplete = self.query_one("#mention-autocomplete", OptionList)
         autocomplete.clear_options()
 
+        from rich.text import Text
+        from textual.widgets.option_list import Option
+
         commands = [
-            "/settings",
-            "/clear",
-            "/sync-rag",
-            "/init-memory",
+            ("/settings", "⚙️", "Configure sound and desktop notification vibes"),
+            ("/clear", "🧹", "Clear all chat history and reset agent"),
+            ("/sync-rag", "🔄", "Incrementally sync notes with Qdrant vector DB"),
+            ("/init-memory", "🧠", "Create and initialize Agent Memory.md"),
         ]
-        matches = [cmd for cmd in commands if cmd.startswith("/" + query)]
+        
+        matches = [cmd for cmd in commands if cmd[0].startswith("/" + query)]
 
         if matches:
-            for match in matches:
-                autocomplete.add_option(match)
+            for cmd, icon, desc in matches:
+                option_text = Text()
+                option_text.append(f"{icon} ", style="bold")
+                
+                lower_cmd = cmd.lower()
+                idx = lower_cmd.find("/" + query)
+                if idx != -1 and query:
+                    option_text.append(cmd[:idx], style="bold #cba6f7")
+                    option_text.append(cmd[idx:idx+len(query)+1], style="bold #fab387 underline")
+                    option_text.append(cmd[idx+len(query)+1:], style="bold #cba6f7")
+                else:
+                    option_text.append(cmd, style="bold #cba6f7")
+                    
+                option_text.append(f"  •  {desc}", style="dim #bac2de")
+                autocomplete.add_option(Option(option_text, id=cmd))
             autocomplete.display = True
         else:
             autocomplete.display = False
@@ -466,11 +568,14 @@ class ChatPanel(Vertical):
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         """Insert selected mention or execute slash command directly."""
-        selected_option = str(event.option.prompt)
-        chat_input = self.query_one("#chat-input", TextArea)
+        if event.option.id is not None:
+            self._insert_autocomplete(str(event.option.id))
 
+    def _insert_autocomplete(self, selected_option: str) -> None:
+        """Insert selected mention or execute slash command directly at the cursor."""
+        chat_input = self.query_one("#chat-input", ChatInput)
+        
         if selected_option.startswith("/"):
-            # Command selection: clear input, hide dropdown, and execute
             chat_input.text = ""
             self._hide_mention_autocomplete()
 
@@ -482,28 +587,41 @@ class ChatPanel(Vertical):
             elif selected_option == "/sync-rag":
                 self.app.run_worker(self.app._sync_rag_background())
             elif selected_option == "/init-memory":
-                # Dispatch submitting /init-memory directly to agent
                 event = ChatInput.Submitted(chat_input, "/init-memory")
                 self.on_chat_input_submitted(event)
 
             chat_input.focus()
             return
 
-        value = chat_input.text
-        parts = value.split(" ")
-
-        if " " in selected_option:
-            replacement = f'@"{selected_option}"'
-        else:
-            replacement = f"@{selected_option}"
-
-        parts[-1] = replacement
-        chat_input.text = " ".join(parts) + " "
+        cursor_row, cursor_col = chat_input.cursor_location
+        lines = chat_input.text.split("\n")
+        current_line = lines[cursor_row]
+        
+        text_before_cursor = current_line[:cursor_col]
+        text_after_cursor = current_line[cursor_col:]
+        
+        match = re.search(r'@([^\s]*)$', text_before_cursor)
+        if match:
+            start_idx = match.start()
+            if " " in selected_option:
+                replacement = f'@"{selected_option}"'
+            else:
+                replacement = f"@{selected_option}"
+                
+            new_line = text_before_cursor[:start_idx] + replacement + " " + text_after_cursor
+            lines[cursor_row] = new_line
+            chat_input.text = "\n".join(lines)
+            
+            new_col = start_idx + len(replacement) + 1
+            chat_input.cursor_location = (cursor_row, new_col)
 
         self._hide_mention_autocomplete()
         chat_input.focus()
 
-    def on_key(self, event) -> None:
-        """Navigate to autocomplete dropdown with arrow key."""
-        if event.key == "down" and self.query_one("#mention-autocomplete").display:
-            self.query_one("#mention-autocomplete").focus()
+    def select_active_autocomplete(self) -> None:
+        """Confirm the currently highlighted autocomplete option."""
+        autocomplete = self.query_one("#mention-autocomplete", OptionList)
+        if autocomplete.display and autocomplete.highlighted is not None:
+            option = autocomplete.get_option_at_index(autocomplete.highlighted)
+            if option and option.id is not None:
+                self._insert_autocomplete(str(option.id))
