@@ -3,6 +3,7 @@
 import os
 import shutil
 from pathlib import Path
+
 from rich.text import Text
 from textual.containers import Horizontal, Vertical
 from textual.screen import ModalScreen
@@ -278,8 +279,8 @@ class AestheticDirectoryTree(DirectoryTree):
             return
         try:
             rel_path = os.path.relpath(path, self.app.agent.vault_path)
-            from src.vault import delete_directory_to_trash, delete_to_trash
             from src.rag import delete_directory_index, delete_file_index
+            from src.vault import delete_directory_to_trash, delete_to_trash
 
             if path.is_dir():
                 res = delete_directory_to_trash(self.app.agent.vault_path, rel_path)

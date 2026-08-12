@@ -12,6 +12,7 @@ from textual.widgets import Label, Markdown, OptionList, TextArea
 
 from src.ui.components.settings_modal import SettingsModal
 
+
 class FocusableMarkdown(Markdown):
     """Markdown widget that can accept keyboard focus for scrolling."""
 
@@ -47,8 +48,8 @@ class ChatInput(TextArea):
 
     def action_open_editor(self) -> None:
         """Open system default text editor (Notepad on Windows) to edit long prompts."""
-        import tempfile
         import subprocess
+        import tempfile
 
         temp_fd, temp_path = tempfile.mkstemp(suffix=".md", prefix="sb_prompt_")
         try:
