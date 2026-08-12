@@ -499,7 +499,8 @@ class ChatPanel(Vertical):
         for p in all_paths:
             filename = os.path.basename(p)
             if query in filename.lower():
-                matches.append(("file", filename, p))
+                abs_p = os.path.join(self.app.agent.vault_path, p)
+                matches.append(("file", filename, p, abs_p))
 
         # Get folders
         try:
@@ -513,7 +514,7 @@ class ChatPanel(Vertical):
                     clean_path = str(rel_path).replace("\\", "/")
                     folder_name = os.path.basename(clean_path)
                     if query in folder_name.lower() or query in clean_path.lower():
-                        matches.append(("folder", clean_path, str(p)))
+                        matches.append(("folder", clean_path, clean_path, str(p)))
         except Exception:
             pass
 
@@ -522,36 +523,36 @@ class ChatPanel(Vertical):
         matches = matches[:5]
 
         if matches:
-            for item_type, name, full_path in matches:
+            for item_type, display_name, option_id, absolute_path in matches:
                 option_text = Text()
                 if item_type == "file":
-                    preview = self._get_note_preview(full_path)
+                    preview = self._get_note_preview(absolute_path)
                     option_text.append("📝 ", style="bold magenta")
                     
-                    lower_fn = name.lower()
+                    lower_fn = display_name.lower()
                     idx = lower_fn.find(query)
                     if idx != -1 and query:
-                        option_text.append(name[:idx], style="bold #cba6f7")
-                        option_text.append(name[idx:idx+len(query)], style="bold #fab387 underline")
-                        option_text.append(name[idx+len(query):], style="bold #cba6f7")
+                        option_text.append(display_name[:idx], style="bold #cba6f7")
+                        option_text.append(display_name[idx:idx+len(query)], style="bold #fab387 underline")
+                        option_text.append(display_name[idx+len(query):], style="bold #cba6f7")
                     else:
-                        option_text.append(name, style="bold #cba6f7")
+                        option_text.append(display_name, style="bold #cba6f7")
                         
                     if preview:
                         option_text.append(f"  •  {preview}", style="dim #bac2de")
                 else:
                     option_text.append("📁 ", style="bold yellow")
                     
-                    lower_name = name.lower()
+                    lower_name = display_name.lower()
                     idx = lower_name.find(query)
                     if idx != -1 and query:
-                        option_text.append(name[:idx], style="bold #cba6f7")
-                        option_text.append(name[idx:idx+len(query)], style="bold #fab387 underline")
-                        option_text.append(name[idx+len(query):], style="bold #cba6f7")
+                        option_text.append(display_name[:idx], style="bold #cba6f7")
+                        option_text.append(display_name[idx:idx+len(query)], style="bold #fab387 underline")
+                        option_text.append(display_name[idx+len(query):], style="bold #cba6f7")
                     else:
-                        option_text.append(name, style="bold #cba6f7")
+                        option_text.append(display_name, style="bold #cba6f7")
                     
-                autocomplete.add_option(Option(option_text, id=name))
+                autocomplete.add_option(Option(option_text, id=option_id))
             autocomplete.display = True
         else:
             autocomplete.display = False

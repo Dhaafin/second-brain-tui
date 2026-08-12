@@ -249,7 +249,8 @@ class SecondBrainAgent:
             )
 
     def parse_file_mentions(self, prompt: str) -> tuple[str, str]:
-        """Detect and load file content mentioned via @filename.md or @'filename'"""
+        """Detect and load file or folder content mentioned via @filename or @'filename'"""
+        from pathlib import Path
         pattern = r'@(?:"([^"]+)"|(\S+))'
         matches = re.findall(pattern, prompt)
 
@@ -258,14 +259,35 @@ class SecondBrainAgent:
 
         for match in matches:
             filename = match[0] if match[0] else match[1]
+            
+            # Check if it is a directory path
+            dir_path = (Path(self.vault_path) / filename).resolve()
+            if dir_path.is_dir() and dir_path.is_relative_to(Path(self.vault_path).resolve()):
+                EXCLUDED_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".venv", "__pycache__"}
+                files_in_dir = []
+                for p in dir_path.rglob("*.md"):
+                    if any(part in EXCLUDED_DIRS for part in p.parts):
+                        continue
+                    rel_p = p.relative_to(Path(self.vault_path).resolve())
+                    files_in_dir.append(str(rel_p).replace("\\", "/"))
+                
+                content = "Folder directory list:\n" + "\n".join(f"- {f}" for f in sorted(files_in_dir))
+                contexts.append(f"=== DIRECTORY LIST OF FOLDER {filename} ===\n{content}\n")
+                clean_prompt = clean_prompt.replace(f"@{filename}", "").replace(
+                    f'@"{filename}"', ""
+                )
+                continue
+
+            # Fallback to note file parsing
+            orig_filename = filename
             if not filename.endswith(".md"):
                 filename += ".md"
 
             content = read_note(self.vault_path, filename)
             if not content.startswith("Error:"):
                 contexts.append(f"=== CONTENT OF {filename} ===\n{content}\n")
-                clean_prompt = clean_prompt.replace(f"@{filename}", "").replace(
-                    f'@"{filename}"', ""
+                clean_prompt = clean_prompt.replace(f"@{orig_filename}", "").replace(
+                    f'@"{orig_filename}"', ""
                 )
 
         return clean_prompt.strip(), "\n".join(contexts)

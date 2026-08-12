@@ -65,10 +65,15 @@ def search_notes(vault_path: str, query: str) -> list[str]:
 
 
 def read_note(vault_path: str, filename: str) -> str:
-    """Read the full contents of a log file based on its name."""
+    """Read the full contents of a log file based on its name or relative path."""
     resolved_vault = Path(vault_path).resolve()
 
-    matching_files = list(resolved_vault.rglob(filename))
+    # Try direct relative path lookup first to avoid duplicate filename rglob issues
+    direct_file = (resolved_vault / filename).resolve()
+    if direct_file.is_file() and direct_file.is_relative_to(resolved_vault):
+        matching_files = [direct_file]
+    else:
+        matching_files = list(resolved_vault.rglob(filename))
 
     if not matching_files:
         return f"Error: Notes '{filename}' is not found."
