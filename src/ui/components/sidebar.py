@@ -199,12 +199,17 @@ class AestheticDirectoryTree(DirectoryTree):
         if event.button == 3:  # Right-click
             event.prevent_default()
             meta = event.style.meta
+            node = None
             if "line" in meta:
                 cursor_line = meta["line"]
                 node = self.get_node_at_line(cursor_line)
                 if node is not None:
                     self.cursor_line = cursor_line
-                    self.action_show_context_menu(node)
+            if node is None:
+                node = self.cursor_node
+
+            if node is not None:
+                self.action_show_context_menu(node)
         else:
             await super()._on_mouse_down(event)
 

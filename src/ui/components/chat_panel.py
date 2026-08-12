@@ -110,7 +110,7 @@ WELCOME_MESSAGE = """\
 ```
 
 **Quick Tips:**
-- Type a message below and press **Enter** to chat with Agnes
+- Press **Ctrl+Enter** (or **Ctrl+J**) to send your message
 - Use `@filename.md` to reference notes in your messages
 - Press **Escape** to close the note viewer
 - Press **Ctrl+C** to cancel an AI request
@@ -139,10 +139,10 @@ class ChatMessage(Vertical):
 
     def on_mount(self) -> None:
         if self.typewriter and self.sender != "You":
-            self.typewriter_timer = self.set_interval(0.015, self._tick_typewriter)
+            self.typewriter_timer = self.set_interval(0.035, self._tick_typewriter)
 
     def _tick_typewriter(self) -> None:
-        chunk_size = 6
+        chunk_size = 20
         self.char_index += chunk_size
 
         if self.char_index >= len(self.full_text):
@@ -156,7 +156,8 @@ class ChatMessage(Vertical):
             md.update(self.current_text)
 
             container = self.app.query_one("#chat-log-container")
-            container.scroll_end(animate=False)
+            if container.scroll_y >= container.max_scroll_y - 2:
+                container.scroll_end(animate=False)
         except Exception:
             pass
 

@@ -75,11 +75,13 @@
     margin: 0;
     background: #45475a;
     color: #f38ba8;
+    border: none;
 }
 
 #close-note-btn:hover {
     background: #f38ba8;
     color: #1e1e2e;
+    text-style: bold;
 }
 
 #note-viewer {
@@ -219,13 +221,14 @@
 #mention-autocomplete {
     display: none;
     dock: bottom;
-    width: 100%;
+    width: 75%;
     height: auto;
     max-height: 8;
-    background: #1e1e2e;
+    background: #181825;
     border: round #cba6f7;
     color: #cdd6f4;
     margin-bottom: 3;
+    margin-left: 2;
 }
 
 
