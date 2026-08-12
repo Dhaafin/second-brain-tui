@@ -180,7 +180,7 @@
 
 #loading-status {
     display: none;
-    height: 1;
+    height: 3;
     width: 100%;
     color: #fab387;
     background: transparent;

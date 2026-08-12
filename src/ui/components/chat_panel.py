@@ -181,7 +181,7 @@ class ChatPanel(Vertical):
         # Surf animation state
         self.surf_pos = 0
         self.surf_dir = 1
-        self.surf_width = 30
+        self.surf_width = 16
         self.wave_offset = 0
         self.wave_chars = "~≈∽≈"
         self.elapsed_time = 0.0
@@ -234,7 +234,7 @@ class ChatPanel(Vertical):
         return f"🌊 {animated_wave} 🌊"
 
     def _animate_loading(self) -> None:
-        """Update the loading status label with surf animation."""
+        """Update the loading status label with stacked, centered surf animation."""
         loading_status = self.query_one("#loading-status", Label)
         self.elapsed_time += 0.1
         dots = "." * (int(self.elapsed_time * 2) % 3 + 1)
@@ -243,7 +243,9 @@ class ChatPanel(Vertical):
         status = self.current_agent_status
 
         loading_status.update(
-            f"{wave_part} | Agnes {status}{dots_fixed} ({self.elapsed_time:.1f}s) | [Ctrl+C to Cancel]"
+            f"{wave_part}\n"
+            f"Agnes {status}{dots_fixed} ({self.elapsed_time:.1f}s)\n"
+            f"[Ctrl+C to Cancel]"
         )
 
     # --- Message Handling ---
