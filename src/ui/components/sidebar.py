@@ -106,6 +106,7 @@ class ContextMenuModal(ModalScreen[str]):
 
             options = [
                 Option("📝 New Note", id="new"),
+                Option("📁 New Folder", id="new_folder"),
                 Option("✏️ Rename", id="rename"),
                 Option("📋 Copy", id="copy"),
                 Option("✂️ Cut", id="cut"),
@@ -152,6 +153,7 @@ class AestheticDirectoryTree(DirectoryTree):
         ("delete", "delete_file", "Delete"),
         ("f2", "rename_file", "Rename"),
         ("n", "new_file", "New Note"),
+        ("f", "new_folder", "New Folder"),
     ]
 
     def render_label(self, node, base_style, style) -> Text:
@@ -227,6 +229,8 @@ class AestheticDirectoryTree(DirectoryTree):
             return
         if action == "new":
             self.action_new_file()
+        elif action == "new_folder":
+            self.action_new_folder()
         elif action == "rename":
             self.action_rename_file()
         elif action == "copy":
@@ -407,6 +411,50 @@ class AestheticDirectoryTree(DirectoryTree):
             self.reload()
         except Exception as e:
             self.app.notify(f"Failed to create note: {e}", severity="error")
+
+    def action_new_folder(self) -> None:
+        """Create a new folder inside the focused directory."""
+        node = self.cursor_node
+        if not node or not node.data:
+            target_dir = Path(self.app.agent.vault_path)
+        else:
+            target_dir = node.data.path if node.data.path.is_dir() else node.data.path.parent
+
+        self.app.push_screen(
+            PromptModal("Create new folder:", default_value="New Folder"),
+            callback=lambda folder_name: self._handle_new_folder_callback(folder_name, target_dir, node),
+        )
+
+    def _handle_new_folder_callback(self, folder_name: str | None, target_dir: Path, parent_node) -> None:
+        if folder_name is None:
+            return
+        folder_name = folder_name.strip()
+        if not folder_name:
+            folder_name = "New Folder"
+
+        new_dir_path = target_dir / folder_name
+        counter = 1
+        while new_dir_path.exists():
+            new_dir_path = target_dir / f"{folder_name} ({counter})"
+            counter += 1
+
+        try:
+            new_dir_path.mkdir(parents=True, exist_ok=True)
+
+            # Update memory cache
+            rel_path = os.path.relpath(new_dir_path, self.app.agent.vault_path)
+            from src.vault import add_folder_to_cache
+            add_folder_to_cache(self.app.agent.vault_path, rel_path)
+
+            self.app.notify(f"Created folder: {new_dir_path.name}")
+            self.reload()
+            
+            # Auto-expand parent node
+            if parent_node:
+                if parent_node.data and parent_node.data.path.is_dir():
+                    parent_node.expand()
+        except Exception as e:
+            self.app.notify(f"Failed to create folder: {e}", severity="error")
 
 
 class SidebarPanel(Vertical):
