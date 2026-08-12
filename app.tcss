@@ -170,12 +170,8 @@
     text-style: bold;
 }
 
-#dashboard-rag {
-    color: #a6e3a1; /* Catppuccin Green */
-}
-
-#dashboard-model {
-    color: #fab387; /* Catppuccin Peach */
+#dashboard-status {
+    color: #b4befe; /* Catppuccin Lavender */
 }
 
 #dashboard-tip {

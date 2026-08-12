@@ -169,8 +169,7 @@ class ChatPanel(Vertical):
         yield VerticalScroll(id="chat-log-container")
         yield Label("", id="loading-status")
         with Horizontal(id="status-dashboard"):
-            yield Label("🟢 RAG: Calculating...", id="dashboard-rag")
-            yield Label("🤖 Model: Loading...", id="dashboard-model")
+            yield Label("🏄 Agnes is waiting for your call...", id="dashboard-status")
             yield Label("💡 Ctrl+E to edit prompt", id="dashboard-tip")
         yield OptionList(id="mention-autocomplete")
         yield ChatInput(id="chat-input")
@@ -191,14 +190,6 @@ class ChatPanel(Vertical):
         # Mount initial welcome message
         self.mount_message("Agent", WELCOME_MESSAGE)
 
-        # Update status dashboard values
-        self.update_rag_status()
-        try:
-            model_name = self.app.agent.model
-            self.query_one("#dashboard-model", Label).update(f"🤖 Model: {model_name}")
-        except Exception:
-            pass
-
     def scroll_chat_to_bottom(self, container) -> None:
         """Scroll the chat log container to the very bottom."""
         container.scroll_end(animate=False)
@@ -217,13 +208,8 @@ class ChatPanel(Vertical):
         container.remove_children()
 
     def update_rag_status(self) -> None:
-        """Update RAG status label with current vault note count."""
-        try:
-            from src.vault import get_all_note_paths
-            notes_count = len(get_all_note_paths(self.app.agent.vault_path))
-            self.query_one("#dashboard-rag", Label).update(f"🟢 RAG: {notes_count} Notes")
-        except Exception as e:
-            logging.getLogger("second_brain").debug("Failed to update RAG status: %s", e)
+        """No-op since RAG status label was removed."""
+        pass
 
     # --- Surf Loading Animation ---
 
