@@ -23,7 +23,7 @@ class SecondBrainApp(App):
     """Main TUI Application with Catppuccin Mocha theme."""
 
     TITLE = "🧠 Second Brain TUI"
-    SUB_TITLE = "v0.1 — Catppuccin Mocha"
+    SUB_TITLE = "v0.1"
     CSS_PATH = "../../app.tcss"
 
     BINDINGS = (
