@@ -33,13 +33,11 @@ class ConfirmModal(ModalScreen[bool]):
         self.styles.animate("background", "rgba(0, 0, 0, 0.6)", duration=0.25)
         container = self.query_one("#confirm-container")
         container.styles.animate("opacity", 1.0, duration=0.25, easing="out_cubic")
-        container.styles.animate("offset", (0, 0), duration=0.25, easing="out_cubic")
 
     def dismiss_with_animation(self, result: bool) -> None:
         self.styles.animate("background", "rgba(0, 0, 0, 0.0)", duration=0.2)
         container = self.query_one("#confirm-container")
-        container.styles.animate("opacity", 0.0, duration=0.2, easing="in_cubic")
-        container.styles.animate("offset", (0, -10), duration=0.2, easing="in_cubic",
+        container.styles.animate("opacity", 0.0, duration=0.2, easing="in_cubic",
                                  on_complete=lambda: self.dismiss(result))
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -73,13 +71,11 @@ class PromptModal(ModalScreen[str]):
         self.styles.animate("background", "rgba(0, 0, 0, 0.6)", duration=0.25)
         container = self.query_one("#prompt-container")
         container.styles.animate("opacity", 1.0, duration=0.25, easing="out_cubic")
-        container.styles.animate("offset", (0, 0), duration=0.25, easing="out_cubic")
 
     def dismiss_with_animation(self, result: str) -> None:
         self.styles.animate("background", "rgba(0, 0, 0, 0.0)", duration=0.2)
         container = self.query_one("#prompt-container")
-        container.styles.animate("opacity", 0.0, duration=0.2, easing="in_cubic")
-        container.styles.animate("offset", (0, -10), duration=0.2, easing="in_cubic",
+        container.styles.animate("opacity", 0.0, duration=0.2, easing="in_cubic",
                                  on_complete=lambda: self.dismiss(result))
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
@@ -125,13 +121,11 @@ class ContextMenuModal(ModalScreen[str]):
         self.styles.animate("background", "rgba(0, 0, 0, 0.6)", duration=0.25)
         container = self.query_one("#context-menu-container")
         container.styles.animate("opacity", 1.0, duration=0.25, easing="out_cubic")
-        container.styles.animate("offset", (0, 0), duration=0.25, easing="out_cubic")
 
     def dismiss_with_animation(self, result: str) -> None:
         self.styles.animate("background", "rgba(0, 0, 0, 0.0)", duration=0.2)
         container = self.query_one("#context-menu-container")
-        container.styles.animate("opacity", 0.0, duration=0.2, easing="in_cubic")
-        container.styles.animate("offset", (0, -10), duration=0.2, easing="in_cubic",
+        container.styles.animate("opacity", 0.0, duration=0.2, easing="in_cubic",
                                  on_complete=lambda: self.dismiss(result))
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:

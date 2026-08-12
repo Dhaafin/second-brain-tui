@@ -278,7 +278,6 @@ SettingsModal {
     border-title-style: bold;
     padding: 1 2;
     opacity: 0.0;
-    offset: 0 -10;
 }
 
 .settings-row {
@@ -329,7 +328,6 @@ ConfirmModal, PromptModal, ContextMenuModal {
     border: thick #cba6f7;
     padding: 1 2;
     opacity: 0.0;
-    offset: 0 -10;
 }
 
 #context-menu-container {
