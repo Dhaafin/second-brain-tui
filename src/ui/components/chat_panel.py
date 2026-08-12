@@ -483,44 +483,75 @@ class ChatPanel(Vertical):
         return preview
 
     def _show_mention_autocomplete(self, query: str) -> None:
-        """Display matching note filenames in the autocomplete dropdown with rich style."""
+        """Display matching note and folder names in the autocomplete dropdown with rich style."""
         autocomplete = self.query_one("#mention-autocomplete", OptionList)
         autocomplete.clear_options()
 
         from src.vault import get_all_note_paths
         from rich.text import Text
         from textual.widgets.option_list import Option
+        from pathlib import Path
 
+        # Get notes
         all_paths = get_all_note_paths(self.app.agent.vault_path)
         
         matches = []
         for p in all_paths:
             filename = os.path.basename(p)
             if query in filename.lower():
-                matches.append((filename, p))
-                
+                matches.append(("file", filename, p))
+
+        # Get folders
+        try:
+            resolved_vault = Path(self.app.agent.vault_path).resolve()
+            EXCLUDED_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".venv", "__pycache__"}
+            for p in resolved_vault.rglob("*"):
+                if p.is_dir():
+                    if any(part in EXCLUDED_DIRS for part in p.parts):
+                        continue
+                    rel_path = p.relative_to(resolved_vault)
+                    clean_path = str(rel_path).replace("\\", "/")
+                    folder_name = os.path.basename(clean_path)
+                    if query in folder_name.lower() or query in clean_path.lower():
+                        matches.append(("folder", clean_path, str(p)))
+        except Exception:
+            pass
+
+        # Sort matches: files first, then folders, alphabetically
+        matches = sorted(matches, key=lambda x: (x[0], x[1].lower()))
         matches = matches[:5]
 
         if matches:
-            for filename, full_path in matches:
-                preview = self._get_note_preview(full_path)
-                
+            for item_type, name, full_path in matches:
                 option_text = Text()
-                option_text.append("📝 ", style="bold magenta")
-                
-                lower_fn = filename.lower()
-                idx = lower_fn.find(query)
-                if idx != -1 and query:
-                    option_text.append(filename[:idx], style="bold #cba6f7")
-                    option_text.append(filename[idx:idx+len(query)], style="bold #fab387 underline")
-                    option_text.append(filename[idx+len(query):], style="bold #cba6f7")
+                if item_type == "file":
+                    preview = self._get_note_preview(full_path)
+                    option_text.append("📝 ", style="bold magenta")
+                    
+                    lower_fn = name.lower()
+                    idx = lower_fn.find(query)
+                    if idx != -1 and query:
+                        option_text.append(name[:idx], style="bold #cba6f7")
+                        option_text.append(name[idx:idx+len(query)], style="bold #fab387 underline")
+                        option_text.append(name[idx+len(query):], style="bold #cba6f7")
+                    else:
+                        option_text.append(name, style="bold #cba6f7")
+                        
+                    if preview:
+                        option_text.append(f"  •  {preview}", style="dim #bac2de")
                 else:
-                    option_text.append(filename, style="bold #cba6f7")
+                    option_text.append("📁 ", style="bold yellow")
                     
-                if preview:
-                    option_text.append(f"  •  {preview}", style="dim #bac2de")
+                    lower_name = name.lower()
+                    idx = lower_name.find(query)
+                    if idx != -1 and query:
+                        option_text.append(name[:idx], style="bold #cba6f7")
+                        option_text.append(name[idx:idx+len(query)], style="bold #fab387 underline")
+                        option_text.append(name[idx+len(query):], style="bold #cba6f7")
+                    else:
+                        option_text.append(name, style="bold #cba6f7")
                     
-                autocomplete.add_option(Option(option_text, id=filename))
+                autocomplete.add_option(Option(option_text, id=name))
             autocomplete.display = True
         else:
             autocomplete.display = False
