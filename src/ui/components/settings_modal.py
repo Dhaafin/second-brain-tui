@@ -44,6 +44,19 @@ class SettingsModal(ModalScreen[bool]):
         self.query_one("#settings-container").border_title = "Preferences"
         self._load_preferences()
 
+        # Entry animations
+        self.styles.animate("background", "rgba(0, 0, 0, 0.6)", duration=0.25)
+        container = self.query_one("#settings-container")
+        container.styles.animate("opacity", 1.0, duration=0.25, easing="out_cubic")
+        container.styles.animate("offset", (0, 0), duration=0.25, easing="out_cubic")
+
+    def dismiss_with_animation(self, result: bool) -> None:
+        self.styles.animate("background", "rgba(0, 0, 0, 0.0)", duration=0.2)
+        container = self.query_one("#settings-container")
+        container.styles.animate("opacity", 0.0, duration=0.2, easing="in_cubic")
+        container.styles.animate("offset", (0, -10), duration=0.2, easing="in_cubic",
+                                 on_complete=lambda: self.dismiss(result))
+
     def _load_preferences(self) -> None:
         """Load settings from Agent Memory.md and apply them to widgets."""
         try:
@@ -75,9 +88,9 @@ class SettingsModal(ModalScreen[bool]):
             pass
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
-        """Handle save and cancel actions."""
+        """Handle save and cancel actions with animation."""
         if event.button.id == "cancel-btn":
-            self.dismiss(False)
+            self.dismiss_with_animation(False)
         elif event.button.id == "save-btn":
             self._save_preferences()
 
@@ -96,9 +109,9 @@ class SettingsModal(ModalScreen[bool]):
             self._update_preference_in_file(memory_file_path, "Desktop Notification", desktop_val)
             self._update_preference_in_file(memory_file_path, "Notification Vibe", vibe_val)
 
-            self.dismiss(True)
+            self.dismiss_with_animation(True)
         except Exception:
-            self.dismiss(False)
+            self.dismiss_with_animation(False)
 
     def _update_preference_in_file(self, file_path: str, key: str, value: str) -> None:
         """Helper to replace or append preferences in Agent Memory.md using regex."""
