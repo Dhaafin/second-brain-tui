@@ -434,9 +434,9 @@ class ChatPanel(Vertical):
         input_height = min(max(3, num_lines + 2), 8)
         event.text_area.styles.height = input_height
 
-        # Sync bottom position of autocomplete menu
+        # Sync bottom position of autocomplete menu using bottom margin
         autocomplete = self.query_one("#mention-autocomplete", OptionList)
-        autocomplete.styles.bottom = input_height
+        autocomplete.styles.margin = (0, 0, input_height, 0)
 
         # Check cursor position to trigger autocomplete
         cursor_row, cursor_col = event.text_area.cursor_location

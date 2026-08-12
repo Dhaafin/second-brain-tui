@@ -218,15 +218,14 @@
 
 #mention-autocomplete {
     display: none;
-    position: absolute;
+    dock: bottom;
     width: 100%;
     height: auto;
     max-height: 8;
     background: #1e1e2e;
     border: round #cba6f7;
     color: #cdd6f4;
-    bottom: 3;
-    left: 0;
+    margin-bottom: 3;
 }
 
 
