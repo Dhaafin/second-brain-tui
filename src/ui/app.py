@@ -6,7 +6,7 @@ import os
 
 from dotenv import load_dotenv
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal
 from textual.widgets import DirectoryTree, Footer, Header, Label, Markdown
 
 from src.agent import SecondBrainAgent
@@ -69,8 +69,15 @@ class SecondBrainApp(App):
                 "Do you want me to initialize it for you? (Type **yes** or **no**)"
             )
 
+        # Load agent memory + vault index in background (non-blocking)
+        self.run_worker(self._load_agent_memory_background())
         # Trigger background RAG sync
         self.run_worker(self._sync_rag_background())
+
+    async def _load_agent_memory_background(self) -> None:
+        """Load agent memory and vault index in a background thread."""
+        await asyncio.to_thread(self.agent.load_memory, True)
+        logging.getLogger("second_brain").info("Agent memory loaded in background.")
 
     async def _sync_rag_background(self) -> None:
         """Incrementally sync vault files with Qdrant vector DB in the background."""
@@ -126,7 +133,10 @@ class SecondBrainApp(App):
     def on_settings_closed(self, preferences_updated: bool) -> None:
         """Callback triggered when the settings modal is closed."""
         if preferences_updated:
-            self.agent.load_memory()
+            # Reload memory in background, no vault index rescan needed
+            async def _reload_memory():
+                await asyncio.to_thread(self.agent.load_memory, False)
+            self.run_worker(_reload_memory())
             self.notify("Settings saved successfully!", severity="information")
             logging.getLogger("second_brain").info("Settings saved and reloaded in agent.")
 

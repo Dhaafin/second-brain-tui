@@ -2,8 +2,8 @@ import json
 import logging
 import os
 import re
+from pathlib import Path
 
-from dotenv import load_dotenv
 from openai import OpenAI
 
 from src.rag import (
@@ -23,6 +23,8 @@ from src.vault import (
     update_vault_index_in_memory,
     write_note,
 )
+
+from dotenv import load_dotenv
 
 load_dotenv(".env.local")
 
@@ -170,6 +172,7 @@ AI_TOOLS = [
 
 class SecondBrainAgent:
     def __init__(self):
+        """Lightweight init — zero I/O. Call load_memory() separately after TUI renders."""
         self.vault_path = os.getenv("OBSIDIAN_PATH")
         self.model = os.getenv("AI_MODEL")
         self.max_steps = int(os.getenv("AI_MAX_STEPS", "10"))
@@ -189,22 +192,28 @@ class SecondBrainAgent:
         )
         self.messages = [{"role": "system", "content": self.system_prompt}]
         self.awaiting_onboarding_consent = False
-        self.load_memory()
+        self._memory_loaded = False
 
-    def load_memory(self) -> None:
+    def load_memory(self, update_index: bool = False) -> None:
         """Read persistent memory from Agent Memory.md and inject it into the chat history."""
-        # Auto-sync Knowledge Map of vault files on load
-        update_vault_index_in_memory(self.vault_path)
+        if update_index:
+            update_vault_index_in_memory(self.vault_path)
 
         memory_content = read_note(self.vault_path, "Agent Memory.md")
 
         if not memory_content.startswith("Error:"):
+            # Remove any previous memory system message before appending fresh one
+            self.messages = [
+                m for m in self.messages
+                if not (m.get("role") == "system" and "persistent memory" in m.get("content", "").lower())
+            ]
             self.messages.append(
                 {
                     "role": "system",
                     "content": f"Here is your persistent memory from the previous session (containing user preferences, active projects, and folder rules):\n\n{memory_content}",
                 }
             )
+        self._memory_loaded = True
 
     def process_onboarding(self, user_response: str) -> str:
         """Process the user's response to the onboarding question for Agent Memory initialization."""
@@ -250,7 +259,6 @@ class SecondBrainAgent:
 
     def parse_file_mentions(self, prompt: str) -> tuple[str, str]:
         """Detect and load file or folder content mentioned via @filename or @'filename'"""
-        from pathlib import Path
         pattern = r'@(?:"([^"]+)"|(\S+))'
         matches = re.findall(pattern, prompt)
 
@@ -293,10 +301,19 @@ class SecondBrainAgent:
         return clean_prompt.strip(), "\n".join(contexts)
 
     def clear_history(self) -> None:
-        """Reset conversation history back to only the system prompt."""
+        """Reset conversation history — no I/O, instant."""
         self.messages = [{"role": "system", "content": self.system_prompt}]
         self.awaiting_onboarding_consent = False
-        self.load_memory()
+        # Re-inject cached memory if available (no disk I/O)
+        if self._memory_loaded:
+            memory_content = read_note(self.vault_path, "Agent Memory.md")
+            if not memory_content.startswith("Error:"):
+                self.messages.append(
+                    {
+                        "role": "system",
+                        "content": f"Here is your persistent memory from the previous session (containing user preferences, active projects, and folder rules):\n\n{memory_content}",
+                    }
+                )
 
     def ask(self, user_message: str, on_status_update=None) -> str:
         """Send a message to the AI and run the tool call loop if necessary"""

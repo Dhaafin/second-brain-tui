@@ -1,10 +1,71 @@
+import shutil
 from pathlib import Path
 
-_notes_cache = {}
-_folders_cache = []
-_cache_loaded = False
+# --- Two-tier cache: paths load fast, content loads lazy on-demand ---
+_note_paths_cache: list[str] = []
+_folders_cache: list[str] = []
+_note_content_cache: dict[str, str] = {}
+_paths_loaded = False
 
-def list_vault_directory(vault_path:str) -> list[str]:
+# Keep legacy alias so external reads from _notes_cache still work
+_notes_cache = _note_content_cache
+
+
+def _ensure_paths_loaded(vault_path: str) -> None:
+    """Load only file paths and folder paths — no file content read."""
+    global _paths_loaded
+
+    if _paths_loaded:
+        return
+
+    vault = Path(vault_path)
+    EXCLUDED_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".venv", "__pycache__"}
+
+    _note_paths_cache.clear()
+    _folders_cache.clear()
+
+    for p in vault.rglob("*"):
+        try:
+            if any(part in EXCLUDED_DIRS for part in p.parts):
+                continue
+
+            if p.is_dir():
+                rel_path = str(p.relative_to(vault)).replace("\\", "/")
+                if rel_path:
+                    _folders_cache.append(rel_path)
+            elif p.is_file() and p.suffix == ".md":
+                rel_path = str(p.relative_to(vault)).replace("\\", "/")
+                _note_paths_cache.append(rel_path)
+        except OSError:
+            continue
+
+    _folders_cache.sort()
+    _note_paths_cache.sort()
+    _paths_loaded = True
+
+
+def _get_note_content(vault_path: str, rel_path: str) -> str | None:
+    """Lazy-load a single note's content into cache on demand."""
+    if rel_path in _note_content_cache:
+        return _note_content_cache[rel_path]
+
+    full_path = Path(vault_path) / rel_path
+    try:
+        if full_path.is_file():
+            content = full_path.read_text(encoding="utf-8", errors="ignore")
+            _note_content_cache[rel_path] = content
+            return content
+    except OSError:
+        pass
+    return None
+
+
+# Legacy compat: old code calls _ensure_cache_loaded
+def _ensure_cache_loaded(vault_path: str) -> None:
+    _ensure_paths_loaded(vault_path)
+
+
+def list_vault_directory(vault_path: str) -> list[str]:
     resolved_vault = Path(vault_path).resolve()
     EXCLUDED_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".venv", "__pycache__"}
     dirs = []
@@ -21,63 +82,42 @@ def list_vault_directory(vault_path:str) -> list[str]:
 
     return sorted(dirs)
 
-def _ensure_cache_loaded(vault_path: str) -> None:
-    global _cache_loaded, _folders_cache
-
-    if _cache_loaded:
-        return
-
-    vault = Path(vault_path)
-    EXCLUDED_DIRS = {".obsidian", ".git", ".trash", "node_modules", ".venv", "__pycache__"}
-
-    _notes_cache.clear()
-    _folders_cache.clear()
-
-    for p in vault.rglob("*"):
-        try:
-            if any(part in EXCLUDED_DIRS for part in p.parts):
-                continue
-
-            if p.is_dir():
-                rel_path = str(p.relative_to(vault)).replace("\\", "/")
-                if rel_path:
-                    _folders_cache.append(rel_path)
-            elif p.is_file() and p.suffix == ".md":
-                rel_path = str(p.relative_to(vault)).replace("\\", "/")
-                content = p.read_text(encoding="utf-8", errors="ignore")
-                _notes_cache[rel_path] = content
-        except OSError:
-            continue
-
-    _folders_cache.sort()
-    _cache_loaded = True
 
 def get_all_folder_paths(vault_path: str) -> list[str]:
     """Retrieve all cached folder paths from the vault."""
-    _ensure_cache_loaded(vault_path)
+    _ensure_paths_loaded(vault_path)
     return _folders_cache
+
 
 def add_folder_to_cache(vault_path: str, rel_path: str) -> None:
     """Expose adding a folder to the in-memory cache directly."""
-    global _folders_cache
-    _ensure_cache_loaded(vault_path)
+    _ensure_paths_loaded(vault_path)
     clean_path = rel_path.replace("\\", "/")
     if clean_path and clean_path not in _folders_cache:
         _folders_cache.append(clean_path)
         _folders_cache.sort()
 
+
 def search_notes(vault_path: str, query: str) -> list[str]:
     """Search for keywords in all cached .md files in the Obsidian folder."""
+    _ensure_paths_loaded(vault_path)
 
-    _ensure_cache_loaded(vault_path)
-    
     results = []
     query_lower = query.lower()
 
-    for rel_path, content in _notes_cache.items():
+    for rel_path in _note_paths_cache:
         filename = Path(rel_path).name
 
-        if query_lower in filename.lower() or query_lower in content.lower():
+        # Check filename match first (no content read needed)
+        if query_lower in filename.lower():
+            content = _get_note_content(vault_path, rel_path)
+            preview = (content or "")[:500]
+            results.append(f"File '{rel_path}'\nContent:\n{preview}")
+            continue
+
+        # Only load content if filename didn't match
+        content = _get_note_content(vault_path, rel_path)
+        if content and query_lower in content.lower():
             preview = content[:500]
             results.append(f"File '{rel_path}'\nContent:\n{preview}")
 
@@ -104,7 +144,11 @@ def read_note(vault_path: str, filename: str) -> str:
         return "Error: Access denied. File is outside the vault."
 
     try:
-        return resolved_file.read_text(encoding="utf-8", errors="ignore")
+        content = resolved_file.read_text(encoding="utf-8", errors="ignore")
+        # Update content cache
+        rel_path = str(resolved_file.relative_to(resolved_vault)).replace("\\", "/")
+        _note_content_cache[rel_path] = content
+        return content
     except OSError:
         return f"Error: Failed to read '{filename}' due to access rights issues."
 
@@ -123,12 +167,16 @@ def write_note(base_dir_str : str, rel_path_str: str, text: str) -> str:
 
         # Normalize path representation
         normalized_rel_path = rel_path_str.replace("\\", "/")
-        _notes_cache[normalized_rel_path] = text
+        _note_content_cache[normalized_rel_path] = text
+
+        # Add to paths cache if not present
+        if normalized_rel_path not in _note_paths_cache:
+            _note_paths_cache.append(normalized_rel_path)
+            _note_paths_cache.sort()
 
         # Update folders cache
         parent_parts = Path(normalized_rel_path).parent.parts
         if parent_parts:
-            global _folders_cache
             for i in range(1, len(parent_parts) + 1):
                 parent_path = "/".join(parent_parts[:i])
                 if parent_path and parent_path not in _folders_cache:
@@ -152,11 +200,17 @@ def append_note(base_dir_str: str, rel_path_str:str, text:str) -> str:
         with open(target_file, "a", encoding="utf-8") as f:
             f.write ("\n" + text)
 
-        if rel_path_str in _notes_cache:
-            _notes_cache[rel_path_str] += "\n" + text
+        normalized = rel_path_str.replace("\\", "/")
+        if normalized in _note_content_cache:
+            _note_content_cache[normalized] += "\n" + text
         else:
-            _notes_cache[rel_path_str] = text
-            
+            _note_content_cache[normalized] = text
+
+        # Add to paths cache if not present
+        if normalized not in _note_paths_cache:
+            _note_paths_cache.append(normalized)
+            _note_paths_cache.sort()
+
         return f"Success: Content Appended to '{rel_path_str}'"
     except OSError:
         return f"Error: Failed to append to '{rel_path_str}' due to access"
@@ -172,10 +226,12 @@ def delete_to_trash(vault_path:str, filename:str) -> str:
     try:
         dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-        import shutil
         shutil.move(str(src_path), str(dest_path))
 
-        _notes_cache.pop(filename, None)
+        normalized = filename.replace("\\", "/")
+        _note_content_cache.pop(normalized, None)
+        if normalized in _note_paths_cache:
+            _note_paths_cache.remove(normalized)
 
         return f"Success: Moved '{filename}' to trash"
     except OSError:
@@ -192,12 +248,15 @@ def restore_from_trash(vault_path:str, filename:str) -> str:
     try:
         dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-        import shutil
         shutil.move(str(src_path), str(dest_path))
 
         try: 
             content = dest_path.read_text(encoding="utf-8", errors="ignore")
-            _notes_cache[filename] = content
+            normalized = filename.replace("\\", "/")
+            _note_content_cache[normalized] = content
+            if normalized not in _note_paths_cache:
+                _note_paths_cache.append(normalized)
+                _note_paths_cache.sort()
         except OSError:
             pass
 
@@ -219,14 +278,17 @@ def delete_directory_to_trash(vault_path: str, dir_path: str) -> str:
     try:
         dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-        import shutil
         shutil.move(str(src_path), str(dest_path))
 
         # Clear matching cache entries
         prefix = dir_path.rstrip("/") + "/"
-        keys_to_remove = [k for k in _notes_cache if k.startswith(prefix) or k == dir_path]
+        keys_to_remove = [k for k in _note_content_cache if k.startswith(prefix) or k == dir_path]
         for k in keys_to_remove:
-            _notes_cache.pop(k, None)
+            _note_content_cache.pop(k, None)
+
+        # Clear matching paths cache entries
+        global _note_paths_cache
+        _note_paths_cache[:] = [p for p in _note_paths_cache if not (p.startswith(prefix) or p == dir_path)]
 
         # Clear matching folders cache entries
         global _folders_cache
@@ -238,8 +300,8 @@ def delete_directory_to_trash(vault_path: str, dir_path: str) -> str:
 
 def get_all_note_paths(vault_path: str) -> list[str]:
     """Retrieve all cached note paths from the vault."""
-    _ensure_cache_loaded(vault_path)
-    return list(_notes_cache.keys())
+    _ensure_paths_loaded(vault_path)
+    return list(_note_paths_cache)
 
 def generate_vault_index(vault_path: str) -> str:
     """Scan all markdown files in the vault and generate a structured index map."""
@@ -317,6 +379,3 @@ def update_vault_index_in_memory(vault_path: str) -> None:
         memory_file.write_text(new_content, encoding="utf-8")
     except OSError:
         pass
-            
-
-    

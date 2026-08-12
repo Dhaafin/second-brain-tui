@@ -1,5 +1,6 @@
 """Sidebar Panel — Custom directory explorer with right-click context menus and file management."""
 
+import asyncio
 import os
 import shutil
 from pathlib import Path
@@ -297,7 +298,11 @@ class AestheticDirectoryTree(DirectoryTree):
                 rel_dest = os.path.relpath(dest_path, self.app.agent.vault_path)
                 from src.rag import delete_file_index, index_file
                 delete_file_index(rel_src)
-                index_file(self.app.agent.vault_path, rel_dest)
+
+                # Background index — don't block UI for embedding generation
+                async def _bg_index(vp=self.app.agent.vault_path, rp=rel_dest):
+                    await asyncio.to_thread(index_file, vp, rp)
+                self.app.run_worker(_bg_index())
 
                 self.app.tui_clipboard = None
                 self.app.notify(f"Moved {src_path.name}")
@@ -368,7 +373,10 @@ class AestheticDirectoryTree(DirectoryTree):
                 delete_directory_index(rel_old)
             else:
                 delete_file_index(rel_old)
-                index_file(self.app.agent.vault_path, rel_new)
+                # Background index — don't block UI for embedding generation
+                async def _bg_index(vp=self.app.agent.vault_path, rp=rel_new):
+                    await asyncio.to_thread(index_file, vp, rp)
+                self.app.run_worker(_bg_index())
 
             self.app.notify(f"Renamed to: {new_name}")
             self.reload()
@@ -404,7 +412,11 @@ class AestheticDirectoryTree(DirectoryTree):
 
             rel_path = os.path.relpath(new_file_path, self.app.agent.vault_path)
             from src.rag import index_file
-            index_file(self.app.agent.vault_path, rel_path)
+
+            # Background index — don't block UI for embedding generation
+            async def _bg_index(vp=self.app.agent.vault_path, rp=rel_path):
+                await asyncio.to_thread(index_file, vp, rp)
+            self.app.run_worker(_bg_index())
 
             self.app.notify(f"Created note: {note_name}")
             self.reload()

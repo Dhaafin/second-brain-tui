@@ -135,25 +135,36 @@ class ChatMessage(Vertical):
             yield Markdown(self.current_text, classes="chat-bubble-content user-content")
         else:
             yield Label("🏄 Agnes", classes="chat-bubble-header agent-header")
-            yield Markdown(self.current_text, id="message-markdown", classes="chat-bubble-content agent-content")
+            if self.typewriter:
+                # Use lightweight Label during animation, swap to Markdown when done
+                yield Label(self.current_text, id="message-label", classes="chat-bubble-content agent-content")
+            else:
+                yield Markdown(self.current_text, id="message-markdown", classes="chat-bubble-content agent-content")
 
     def on_mount(self) -> None:
         if self.typewriter and self.sender != "You":
-            self.typewriter_timer = self.set_interval(0.035, self._tick_typewriter)
+            self.typewriter_timer = self.set_interval(0.05, self._tick_typewriter)
 
     def _tick_typewriter(self) -> None:
-        chunk_size = 20
+        chunk_size = 40
         self.char_index += chunk_size
 
         if self.char_index >= len(self.full_text):
             self.current_text = self.full_text
             self.typewriter_timer.stop()
+            # Swap Label -> Markdown for proper rendering of final text
+            try:
+                label = self.query_one("#message-label", Label)
+                label.remove()
+                self.mount(Markdown(self.full_text, id="message-markdown", classes="chat-bubble-content agent-content"))
+            except Exception:
+                pass
         else:
             self.current_text = self.full_text[:self.char_index]
 
         try:
-            md = self.query_one("#message-markdown", Markdown)
-            md.update(self.current_text)
+            label = self.query_one("#message-label", Label)
+            label.update(self.current_text)
 
             container = self.app.query_one("#chat-log-container")
             if container.scroll_y >= container.max_scroll_y - 2:
@@ -177,6 +188,7 @@ class ChatPanel(Vertical):
     def on_mount(self) -> None:
         self.query_one("#mention-autocomplete").display = False
         self.note_preview_cache = {}
+        self._autocomplete_timer = None
 
         # Surf animation state
         self.surf_pos = 0
@@ -236,7 +248,7 @@ class ChatPanel(Vertical):
     def _animate_loading(self) -> None:
         """Update the loading status label with stacked, centered surf animation."""
         loading_status = self.query_one("#loading-status", Label)
-        self.elapsed_time += 0.1
+        self.elapsed_time += 0.2
         dots = "." * (int(self.elapsed_time * 2) % 3 + 1)
         dots_fixed = dots.ljust(3, " ")
         wave_part = self._generate_surf_frame()
@@ -297,7 +309,7 @@ class ChatPanel(Vertical):
         self.current_agent_status = "is thinking"
         loading_status.display = True
 
-        self.loading_timer = self.set_interval(0.1, self._animate_loading)
+        self.loading_timer = self.set_interval(0.2, self._animate_loading)
         self.current_worker = self.run_worker(self._get_agent_response(user_text))
 
     async def _get_agent_response(self, prompt: str) -> None:
@@ -329,9 +341,9 @@ class ChatPanel(Vertical):
             # Mount agent response bubble
             self.mount_message("Agent", response)
 
-            # Refresh sidebar and trigger notifications
+            # Refresh sidebar and trigger notifications (non-blocking)
             self.app.query_one("#file-tree").reload()
-            self._trigger_notifications()
+            self.run_worker(self._trigger_notifications_async())
 
         except asyncio.CancelledError:
             # Ensure loading state is always cleaned up
@@ -343,7 +355,11 @@ class ChatPanel(Vertical):
 
     # --- Notifications ---
 
-    def _trigger_notifications(self) -> None:
+    async def _trigger_notifications_async(self) -> None:
+        """Run notifications in background thread to avoid blocking UI."""
+        await asyncio.to_thread(self._trigger_notifications_sync)
+
+    def _trigger_notifications_sync(self) -> None:
         """Play sound and show desktop notification based on Agent Memory.md preferences."""
         try:
             memory_path = os.path.join(self.app.agent.vault_path, "Agent Memory.md")
@@ -427,6 +443,11 @@ class ChatPanel(Vertical):
         autocomplete = self.query_one("#mention-autocomplete", OptionList)
         autocomplete.styles.margin = (0, 0, input_height, 0)
 
+        # Cancel any pending autocomplete timer
+        if self._autocomplete_timer is not None:
+            self._autocomplete_timer.stop()
+            self._autocomplete_timer = None
+
         # Check cursor position to trigger autocomplete
         cursor_row, cursor_col = event.text_area.cursor_location
         lines = value.split("\n")
@@ -440,24 +461,26 @@ class ChatPanel(Vertical):
             
             if match_mention:
                 query = match_mention.group(1).lower()
-                self._show_mention_autocomplete(query)
+                self._autocomplete_timer = self.set_timer(0.12, lambda: self._show_mention_autocomplete(query))
                 return
             elif match_cmd:
                 query = match_cmd.group(1).lower()
-                self._show_command_autocomplete(query)
+                self._autocomplete_timer = self.set_timer(0.12, lambda: self._show_command_autocomplete(query))
                 return
                 
         self._hide_mention_autocomplete()
 
     def _get_note_preview(self, rel_path: str) -> str:
         """Get the first non-empty line of the note as a preview from cache."""
-        if rel_path in self.note_preview_cache:
-            return self.note_preview_cache[rel_path]
+        # Normalize key
+        normalized = rel_path.replace("\\", "/")
+        if normalized in self.note_preview_cache:
+            return self.note_preview_cache[normalized]
 
-        from src.vault import _notes_cache
+        from src.vault import _get_note_content
         preview = ""
         try:
-            content = _notes_cache.get(rel_path)
+            content = _get_note_content(self.app.agent.vault_path, normalized)
             if content:
                 for line in content.split("\n"):
                     line_str = line.strip()
@@ -469,7 +492,7 @@ class ChatPanel(Vertical):
         except Exception:
             pass
 
-        self.note_preview_cache[rel_path] = preview
+        self.note_preview_cache[normalized] = preview
         return preview
 
     def _show_mention_autocomplete(self, query: str) -> None:
