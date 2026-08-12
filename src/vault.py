@@ -59,10 +59,10 @@ def get_all_folder_paths(vault_path: str) -> list[str]:
 
 def add_folder_to_cache(vault_path: str, rel_path: str) -> None:
     """Expose adding a folder to the in-memory cache directly."""
+    global _folders_cache
     _ensure_cache_loaded(vault_path)
     clean_path = rel_path.replace("\\", "/")
     if clean_path and clean_path not in _folders_cache:
-        global _folders_cache
         _folders_cache.append(clean_path)
         _folders_cache.sort()
 
